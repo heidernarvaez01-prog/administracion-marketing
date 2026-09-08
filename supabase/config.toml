@@ -1,1 +1,6 @@
 project_id = "prkmsvbzxhztplvdtwaq"
+
+[functions.windsor-metrics]
+# Las páginas Eclan (HTML estático) llaman a esta función solo con la
+# apikey pública (anon), sin sesión de usuario logueado.
+verify_jwt = false

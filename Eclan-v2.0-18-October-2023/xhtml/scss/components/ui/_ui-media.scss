@@ -1,0 +1,10 @@
+.media{
+    display: flex;
+    align-items: start;
+    .media-body{
+        flex-grow: 1;
+    }
+    img{
+        border-radius: 3px;
+    }
+}
