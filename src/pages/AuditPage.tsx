@@ -7,14 +7,12 @@ import { fetchCampaignData, getCampaignCost, clearCampaignDataCache } from '@/li
 import { buildAuditRows } from '@/lib/audit-helpers';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plus, LayoutGrid, Layers, ArrowLeft, ClipboardCheck } from 'lucide-react';
+import { Plus, LayoutGrid, Layers, ArrowLeft, ClipboardCheck, Wallet, TrendingUp, CheckCircle2, TrendingDown, AlertTriangle } from 'lucide-react';
 import AuditForm from '@/components/AuditForm';
 import AuditTable, { type AuditRowData } from '@/components/AuditTable';
 import AdSetTable from '@/components/AdSetTable';
-import { Sparkline } from '@/components/Sparkline';
 import PageHero from '@/components/PageHero';
-import chartIllustration from '@/assets/template/chart.png';
+import EclanStatCard from '@/components/EclanStatCard';
 import type { ApiCampaignRow } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -152,24 +150,12 @@ export default function AuditPage() {
           client?.description ||
           'Da seguimiento en tiempo real a si cada campaña gasta bien y rinde bien.'
         }
-        decoration={
-          <img src={chartIllustration} alt="" aria-hidden className="h-24 w-auto rounded-md opacity-90 object-cover" />
-        }
         actions={
           <>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="bg-primary-foreground/15 hover:bg-primary-foreground/25 text-primary-foreground border-primary-foreground/20"
-              onClick={() => navigate('/app')}
-            >
+            <Button variant="outline" size="sm" onClick={() => navigate('/app')}>
               <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Clientes
             </Button>
-            <Button
-              size="sm"
-              className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-sm"
-              onClick={() => { setEditRecord(null); setShowForm(true); }}
-            >
+            <Button size="sm" onClick={() => { setEditRecord(null); setShowForm(true); }}>
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Nueva auditoría
             </Button>
           </>
@@ -180,37 +166,41 @@ export default function AuditPage() {
       {/* Summary cards */}
       {auditRows.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <SummaryCard
+          <EclanStatCard
+            icon={Wallet}
             label="Presupuesto total"
             value={`$${summary.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
             hint="Suma del presupuesto aprobado en todas las campañas auditadas."
             accent="primary"
           />
-          <SummaryCard
+          <EclanStatCard
+            icon={TrendingUp}
             label="Gasto total"
             value={`$${summary.spent.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-            hint="Suma del gasto real consolidado (excluye hoy y ayer). El sparkline muestra el gasto acumulado día a día."
-            sparkline={summary.cumulativeSpend}
+            hint="Suma del gasto real consolidado (excluye hoy y ayer)."
             accent="info"
           />
-          <SummaryCard
+          <EclanStatCard
+            icon={CheckCircle2}
             label="En ritmo"
             value={summary.ok.toString()}
             hint="Campañas dentro de ±10% del ritmo ideal."
             pulse={summary.ok > 0}
             accent="success"
           />
-          <SummaryCard
+          <EclanStatCard
+            icon={TrendingDown}
             label="Subgastando"
             value={summary.under.toString()}
             hint="Campañas gastando menos del 90% de lo ideal — riesgo de no usar todo el presupuesto."
             accent="warning"
           />
-          <SummaryCard
+          <EclanStatCard
+            icon={AlertTriangle}
             label="Sobregastando"
             value={summary.over.toString()}
             hint="Campañas gastando más del 110% de lo ideal — riesgo de agotar el presupuesto antes de tiempo."
-            accent="destructive"
+            accent="danger"
           />
         </div>
       )}
@@ -280,61 +270,3 @@ export default function AuditPage() {
   );
 }
 
-type SummaryAccent = 'primary' | 'info' | 'success' | 'warning' | 'destructive';
-
-const SUMMARY_ACCENT_CLASS: Record<SummaryAccent, string> = {
-  primary: 'bg-primary text-primary-foreground',
-  info: 'bg-info text-info-foreground',
-  success: 'bg-success text-success-foreground',
-  warning: 'bg-warning text-warning-foreground',
-  destructive: 'bg-destructive text-destructive-foreground',
-};
-
-function SummaryCard({
-  label,
-  value,
-  hint,
-  sparkline,
-  pulse,
-  accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  sparkline?: number[];
-  pulse?: boolean;
-  accent?: SummaryAccent;
-}) {
-  const isAccent = !!accent;
-  const card = (
-    <div
-      className={`rounded-lg p-4 cursor-help relative overflow-hidden transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 animate-fade-in
-        ${isAccent
-          ? `${SUMMARY_ACCENT_CLASS[accent]} shadow-sm`
-          : 'border border-border bg-card text-foreground'}`}
-    >
-      <div className="flex items-center gap-1.5 relative z-10">
-        {pulse && (
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 bg-current" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
-          </span>
-        )}
-        <p className={`text-[10px] uppercase tracking-wider ${isAccent ? 'opacity-85' : 'text-muted-foreground'}`}>{label}</p>
-      </div>
-      <p className="text-2xl font-bold font-mono leading-tight mt-1 relative z-10">{value}</p>
-      {sparkline && sparkline.length > 1 && (
-        <div className="absolute inset-x-0 bottom-0 h-10 opacity-80 pointer-events-none">
-          <Sparkline data={sparkline} width={300} height={40} className={isAccent ? 'opacity-70' : 'text-primary'} />
-        </div>
-      )}
-    </div>
-  );
-  if (!hint) return card;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{card}</TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-xs text-xs">{hint}</TooltipContent>
-    </Tooltip>
-  );
-}

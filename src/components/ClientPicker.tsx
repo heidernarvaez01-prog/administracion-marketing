@@ -118,18 +118,13 @@ export default function ClientPicker({ title, subtitle, basePath, icon: Icon, mo
     );
   }
 
-  // Color theme per section — semantic tokens only (mirrors AppSidebar's
-  // per-feature accent so the same section reads the same color everywhere).
+  // Color theme per section — insignia sólida de un solo color, mismo
+  // lenguaje que EclanStatCard/AppSidebar (sin gradiente).
   type Accent = 'warning' | 'secondary' | 'info';
   const ACCENT_TILE: Record<Accent, string> = {
-    warning: 'bg-gradient-to-br from-warning to-warning/80 text-warning-foreground',
-    secondary: 'bg-gradient-to-br from-secondary to-secondary/80 text-secondary-foreground',
-    info: 'bg-gradient-to-br from-info to-info/80 text-info-foreground',
-  };
-  const ACCENT_BAR: Record<Accent, string> = {
-    warning: 'bg-gradient-to-r from-warning to-warning/80',
-    secondary: 'bg-gradient-to-r from-secondary to-secondary/80',
-    info: 'bg-gradient-to-r from-info to-info/80',
+    warning: 'bg-warning text-warning-foreground',
+    secondary: 'bg-secondary text-secondary-foreground',
+    info: 'bg-info text-info-foreground',
   };
   const ACCENT_BADGE: Record<Accent, string> = {
     warning: 'bg-warning/10 text-warning border-warning/20',
@@ -143,7 +138,6 @@ export default function ClientPicker({ title, subtitle, basePath, icon: Icon, mo
   };
   const theme = modeTheme[mode];
   const tileCls = ACCENT_TILE[theme.accent];
-  const barCls = ACCENT_BAR[theme.accent];
   const badgeCls = ACCENT_BADGE[theme.accent];
 
   return (
@@ -153,11 +147,7 @@ export default function ClientPicker({ title, subtitle, basePath, icon: Icon, mo
         title={title}
         subtitle={subtitle}
         actions={
-          <Button
-            size="sm"
-            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-sm"
-            onClick={() => { setName(''); setDescription(''); setDialogOpen(true); }}
-          >
+          <Button size="sm" onClick={() => { setName(''); setDescription(''); setDialogOpen(true); }}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Nuevo cliente
           </Button>
@@ -202,19 +192,11 @@ export default function ClientPicker({ title, subtitle, basePath, icon: Icon, mo
               type="button"
               onClick={() => navigate(`${basePath}/${c.id}`)}
               className="text-left relative overflow-hidden rounded-xl border border-border bg-card p-5 cursor-pointer group
-                transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:border-transparent
+                transition-all duration-200 hover:shadow-md hover:-translate-y-0.5
                 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
-              {/* Accent bar */}
-              <div className={`absolute inset-x-0 top-0 h-1 ${barCls}`} />
-              {/* Decorative blob */}
-              <div
-                aria-hidden
-                className={`pointer-events-none absolute -right-10 -bottom-10 h-28 w-28 rounded-full ${tileCls} opacity-[0.08] group-hover:opacity-[0.18] transition-opacity blur-xl`}
-              />
-
               <div className="relative flex items-start gap-3">
-                <div className={`shrink-0 h-10 w-10 rounded-lg ${tileCls} flex items-center justify-center shadow-sm`}>
+                <div className={`shrink-0 h-10 w-10 rounded-lg ${tileCls} flex items-center justify-center`}>
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">

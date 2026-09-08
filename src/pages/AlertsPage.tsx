@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PageHero from '@/components/PageHero';
+import EclanStatCard from '@/components/EclanStatCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAlertThresholds, type UserAlertRule } from '@/hooks/useAlertThresholds';
@@ -281,33 +282,32 @@ export default function AlertsPage() {
         icon={Bell}
         title="Alertas"
         subtitle="Solo las alertas que importan: marcamos una campaña cuando sobregasta, deja de entregar, está por terminar, se encarece o sus creativos se desgastan. Sin ruido."
-        gradient="from-destructive via-destructive to-warning"
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatTile
+        <EclanStatCard
           icon={AlertCircle}
           label="Críticas"
-          value={stats.danger}
-          accent="destructive"
+          value={stats.danger.toString()}
+          accent="danger"
           pulse={stats.danger > 0}
         />
-        <StatTile
+        <EclanStatCard
           icon={AlertTriangle}
           label="Advertencias"
-          value={stats.warning}
+          value={stats.warning.toString()}
           accent="warning"
         />
-        <StatTile
+        <EclanStatCard
           icon={Info}
           label="Atención"
-          value={stats.info}
+          value={stats.info.toString()}
           accent="info"
         />
-        <StatTile
+        <EclanStatCard
           icon={CheckCircle2}
           label="Saludables"
-          value={healthyCount}
+          value={healthyCount.toString()}
           accent="success"
         />
       </div>
@@ -640,44 +640,3 @@ export default function AlertsPage() {
   );
 }
 
-const STAT_TILE_ACCENT_CLASS: Record<'destructive' | 'warning' | 'info' | 'success', string> = {
-  destructive: 'bg-destructive text-destructive-foreground',
-  warning: 'bg-warning text-warning-foreground',
-  info: 'bg-info text-info-foreground',
-  success: 'bg-success text-success-foreground',
-};
-
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  accent,
-  pulse,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  accent: keyof typeof STAT_TILE_ACCENT_CLASS;
-  pulse?: boolean;
-}) {
-  return (
-    <div
-      className={`relative overflow-hidden rounded-lg p-4 shadow-sm
-        ${STAT_TILE_ACCENT_CLASS[accent]} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md animate-fade-in`}
-    >
-      <div aria-hidden className="absolute -right-4 -bottom-4 opacity-20">
-        <Icon className="h-20 w-20" />
-      </div>
-      <div className="relative flex items-center gap-2">
-        {pulse && (
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 bg-current" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
-          </span>
-        )}
-        <p className="text-[10px] uppercase tracking-wider opacity-85">{label}</p>
-      </div>
-      <p className="relative mt-1 text-3xl font-bold font-mono leading-none">{value}</p>
-    </div>
-  );
-}

@@ -8,7 +8,6 @@ import { buildAuditRows } from '@/lib/audit-helpers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -17,7 +16,7 @@ import {
 import { Plus, Pencil, Trash2, Loader2, FolderOpen, Briefcase, ArrowRight, Search, Users, Megaphone, Wallet, TrendingUp, AlertTriangle, AlertCircle, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageHero from '@/components/PageHero';
-import dashboardIllustration from '@/assets/template/dashboard.png';
+import EclanStatCard from '@/components/EclanStatCard';
 import type { ApiCampaignRow } from '@/lib/api';
 import type { AuditRowData } from '@/components/AuditTable';
 import { toast } from 'sonner';
@@ -207,15 +206,8 @@ export default function ClientsPage() {
         icon={Users}
         title="Clientes"
         subtitle="Cada cliente tiene su propio espacio. Abre uno para dar seguimiento a sus campañas, presupuestos y resultados en tiempo real."
-        decoration={
-          <img src={dashboardIllustration} alt="" aria-hidden className="h-24 w-auto rounded-md opacity-90 object-cover" />
-        }
         actions={
-          <Button
-            size="sm"
-            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 shadow-sm"
-            onClick={openCreate}
-          >
+          <Button size="sm" onClick={openCreate}>
             <Plus className="h-3.5 w-3.5 mr-1.5" /> Nuevo cliente
           </Button>
         }
@@ -249,11 +241,11 @@ export default function ClientsPage() {
       {/* Global summary across all clients */}
       {clients.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <GradientStat icon={Users} label="Clientes" value={clients.length.toString()} accent="primary" />
-          <GradientStat icon={Megaphone} label="Campañas" value={totals.campaigns.toString()} accent="info" />
-          <GradientStat icon={Wallet} label="Presupuesto total" value={fmt(totals.budget)} accent="secondary" />
-          <GradientStat icon={TrendingUp} label="Gasto total" value={fmt(totals.spent)} accent="success" />
-          <GradientStat
+          <EclanStatCard icon={Users} label="Clientes" value={clients.length.toString()} accent="primary" />
+          <EclanStatCard icon={Megaphone} label="Campañas" value={totals.campaigns.toString()} accent="info" />
+          <EclanStatCard icon={Wallet} label="Presupuesto total" value={fmt(totals.budget)} accent="secondary" />
+          <EclanStatCard icon={TrendingUp} label="Gasto total" value={fmt(totals.spent)} accent="success" />
+          <EclanStatCard
             icon={AlertTriangle}
             label="En riesgo"
             value={(totals.over + totals.under).toString()}
@@ -299,31 +291,27 @@ export default function ClientsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.map((c, idx) => {
             const s = summaries.get(c.id) || { campaigns: 0, budget: 0, spent: 0, ok: 0, under: 0, over: 0 };
-            // Rotate accent palette across cards — driven by semantic tokens
-            const palettes = [
-              { grad: 'from-primary to-primary/80', fg: 'text-primary-foreground' },
-              { grad: 'from-info to-info/80', fg: 'text-info-foreground' },
-              { grad: 'from-success to-success/80', fg: 'text-success-foreground' },
-              { grad: 'from-secondary to-secondary/80', fg: 'text-secondary-foreground' },
-              { grad: 'from-warning to-warning/80', fg: 'text-warning-foreground' },
-              { grad: 'from-destructive to-destructive/80', fg: 'text-destructive-foreground' },
+            // Rotate accent palette across cards — driven por los mismos tokens
+            // semánticos que EclanStatCard, estilo insignia sólida (no gradiente)
+            const palettes: { bg: string; fg: string }[] = [
+              { bg: 'bg-primary', fg: 'text-primary-foreground' },
+              { bg: 'bg-info', fg: 'text-info-foreground' },
+              { bg: 'bg-success', fg: 'text-success-foreground' },
+              { bg: 'bg-secondary', fg: 'text-secondary-foreground' },
+              { bg: 'bg-warning', fg: 'text-warning-foreground' },
+              { bg: 'bg-destructive', fg: 'text-destructive-foreground' },
             ];
-            const { grad: accent, fg: accentFg } = palettes[idx % palettes.length];
+            const { bg: accentBg, fg: accentFg } = palettes[idx % palettes.length];
             const initials = c.name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('') || '·';
             return (
               <div
                 key={c.id}
                 onClick={() => navigate(`/app/client/${c.id}`)}
                 className="relative overflow-hidden rounded-xl border border-border bg-card p-5 cursor-pointer group
-                  transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:border-transparent"
+                  transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
               >
-                {/* Top gradient accent bar */}
-                <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accent}`} />
-                {/* Decorative blob */}
-                <div aria-hidden className={`pointer-events-none absolute -right-10 -bottom-10 h-32 w-32 rounded-full bg-gradient-to-br ${accent} opacity-[0.08] group-hover:opacity-[0.18] transition-opacity blur-xl`} />
-
                 <div className="relative flex items-start gap-3">
-                  <div className={`shrink-0 h-11 w-11 rounded-lg bg-gradient-to-br ${accent} ${accentFg} flex items-center justify-center font-bold text-sm shadow-sm`}>
+                  <div className={`shrink-0 h-11 w-11 rounded-lg ${accentBg} ${accentFg} flex items-center justify-center font-bold text-sm`}>
                     {initials}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -450,51 +438,4 @@ function StatusDot({ count, color, label }: { count: number; color: string; labe
   );
 }
 
-const GRADIENT_STAT_ACCENT_CLASS: Record<'primary' | 'info' | 'secondary' | 'success' | 'warning' | 'destructive', string> = {
-  primary: 'bg-primary text-primary-foreground',
-  info: 'bg-info text-info-foreground',
-  secondary: 'bg-secondary text-secondary-foreground',
-  success: 'bg-success text-success-foreground',
-  warning: 'bg-warning text-warning-foreground',
-  destructive: 'bg-destructive text-destructive-foreground',
-};
-
-function GradientStat({
-  icon: Icon, label, value, accent, hint, pulse,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  accent: keyof typeof GRADIENT_STAT_ACCENT_CLASS;
-  hint?: string;
-  pulse?: boolean;
-}) {
-  const card = (
-    <div
-      className={`relative overflow-hidden rounded-lg p-4 shadow-sm cursor-help
-        ${GRADIENT_STAT_ACCENT_CLASS[accent]} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md animate-fade-in`}
-    >
-      <div aria-hidden className="absolute -right-3 -bottom-3 opacity-20">
-        <Icon className="h-16 w-16" />
-      </div>
-      <div className="relative flex items-center gap-1.5">
-        {pulse && (
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 bg-current" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
-          </span>
-        )}
-        <p className="text-[10px] uppercase tracking-wider opacity-85">{label}</p>
-      </div>
-      <p className="relative mt-1 text-2xl font-bold font-mono leading-none">{value}</p>
-    </div>
-  );
-  if (!hint) return card;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{card}</TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-xs text-xs">{hint}</TooltipContent>
-    </Tooltip>
-  );
-}
 

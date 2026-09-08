@@ -100,7 +100,6 @@ export default function AskAIPage() {
         icon={Sparkles}
         title="Preguntar a la IA"
         subtitle="Pregunta cualquier cosa sobre tus campañas — rendimiento, ritmo, alertas, optimizaciones. Acótalo a un cliente y campaña para una respuesta más precisa, o déjalo abierto para comparar entre cuentas."
-        gradient="from-cyan-600 via-sky-500 to-indigo-600"
       />
 
       <Card className="p-4 flex flex-wrap items-center gap-3">

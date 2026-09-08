@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import PageHero from '@/components/PageHero';
+import EclanStatCard from '@/components/EclanStatCard';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -271,14 +272,13 @@ export default function AdminPage() {
         icon={Shield}
         title="Equipo"
         subtitle="Invita miembros por correo, asigna un rol y — cuando quieras — dales acceso a cuentas específicas."
-        gradient="from-sidebar-background via-sidebar-background to-primary"
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <AdminStat icon={Users} label="Miembros" value={users.length} accent="primary" />
-        <AdminStat icon={ShieldCheck} label="Admins" value={adminIds.size} accent="secondary" />
-        <AdminStat icon={Link2} label="Asignaciones" value={assignments.length} accent="info" />
-        <AdminStat icon={Building2} label="Cuentas" value={accounts.length} accent="success" />
+        <EclanStatCard icon={Users} label="Miembros" value={users.length.toString()} accent="primary" />
+        <EclanStatCard icon={ShieldCheck} label="Admins" value={adminIds.size.toString()} accent="secondary" />
+        <EclanStatCard icon={Link2} label="Asignaciones" value={assignments.length.toString()} accent="info" />
+        <EclanStatCard icon={Building2} label="Cuentas" value={accounts.length.toString()} accent="success" />
       </div>
 
       {/* Añadir / actualizar miembro — flujo único, cuenta opcional */}
@@ -539,31 +539,3 @@ function InlineAssign({
   );
 }
 
-const ADMIN_STAT_ACCENT_CLASS: Record<'primary' | 'secondary' | 'info' | 'success', string> = {
-  primary: 'bg-primary text-primary-foreground',
-  secondary: 'bg-secondary text-secondary-foreground',
-  info: 'bg-info text-info-foreground',
-  success: 'bg-success text-success-foreground',
-};
-
-function AdminStat({
-  icon: Icon, label, value, accent,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-  accent: keyof typeof ADMIN_STAT_ACCENT_CLASS;
-}) {
-  return (
-    <div
-      className={`relative overflow-hidden rounded-lg p-4 shadow-sm
-        ${ADMIN_STAT_ACCENT_CLASS[accent]} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md animate-fade-in`}
-    >
-      <div aria-hidden className="absolute -right-3 -bottom-3 opacity-20">
-        <Icon className="h-16 w-16" />
-      </div>
-      <p className="relative text-[10px] uppercase tracking-wider opacity-85">{label}</p>
-      <p className="relative mt-1 text-3xl font-bold font-mono leading-none">{value}</p>
-    </div>
-  );
-}
