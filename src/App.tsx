@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,12 +34,25 @@ import logo from "@/assets/apache-studio-logo.png.asset.json";
 
 const queryClient = new QueryClient();
 
-/** Aplica el theme "Aside" (colores/tipografía) sólo dentro de /app, sin
- *  afectar el resto del sitio (Index, slideshow, Eclan). Ver src/index.css
- *  — clase .ad-audit-theme. */
+/** Aplica el theme "Aside" (colores/tipografía) sólo mientras se está en
+ *  /app, sin afectar el resto del sitio (Index, Eclan). La clase va en
+ *  <html> (no en un div anidado) porque tanto los charts de ECharts
+ *  (src/lib/echarts-theme.ts lee getComputedStyle(document.documentElement))
+ *  como el contenido de Radix que hace portal (Select/Dialog/Sheet/
+ *  Tooltip/Toast, que se montan en document.body, fuera del árbol de
+ *  React) necesitan que las variables CSS vivan en la raíz del documento,
+ *  no en un descendiente — igual que .dark, que useTheme() también aplica
+ *  sobre <html>. Ver src/index.css — clase .ad-audit-theme. */
 function AdAuditThemeScope() {
+  useEffect(() => {
+    document.documentElement.classList.add("ad-audit-theme");
+    return () => {
+      document.documentElement.classList.remove("ad-audit-theme");
+    };
+  }, []);
+
   return (
-    <div className="ad-audit-theme min-h-screen">
+    <div className="min-h-screen">
       <Outlet />
     </div>
   );

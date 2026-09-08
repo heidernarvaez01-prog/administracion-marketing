@@ -213,7 +213,13 @@
     --sidebar-ring: 180 48% 52%;
     --sidebar-glow: 180 48% 52%;
     --sidebar-hover: 217 35% 17%;
+  }
 
+  /* body tiene su propia regla `font-family: 'IBM Plex Sans'` más abajo,
+     que por ser una declaración directa (no heredada) le gana a lo que
+     .ad-audit-theme intente heredar desde <html>. Se pisa explícito acá,
+     sólo dentro del scope. */
+  .ad-audit-theme body {
     font-family: 'Gudea', 'Helvetica Neue', Arial, sans-serif;
     font-size: 0.875rem;
   }
