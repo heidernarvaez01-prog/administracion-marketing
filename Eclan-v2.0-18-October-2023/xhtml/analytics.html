@@ -983,23 +983,17 @@
 							<div class="col-xl-12 col-xxl-6">
 								<div class="card" id="user-activity">
 									<div class="card-header pb-0 d-block d-sm-flex border-0">
-										<h3 class="fs-20 text-black mb-0">Click Summary</h3>
+										<h3 class="fs-20 text-black mb-0">Resumen de Clics</h3>
 										<div class="card-action card-tabs mt-3 mt-sm-0">
-											<ul class="nav nav-tabs" role="tablist">
+											<ul class="nav nav-tabs range-tabs" role="tablist">
 												<li class="nav-item">
-													<a class="nav-link active" data-bs-toggle="tab" href="#monthly" role="tab">
-														Monthly
-													</a>
+													<a class="nav-link active" href="javascript:void(0);" data-preset="last_90d">90 días</a>
 												</li>
 												<li class="nav-item">
-													<a class="nav-link" data-bs-toggle="tab" href="#weekly" role="tab">
-														Weekly
-													</a>
+													<a class="nav-link" href="javascript:void(0);" data-preset="last_30d">30 días</a>
 												</li>
 												<li class="nav-item">
-													<a class="nav-link" data-bs-toggle="tab" href="#today" role="tab">
-														Today
-													</a>
+													<a class="nav-link" href="javascript:void(0);" data-preset="last_7d">7 días</a>
 												</li>
 											</ul>
 										</div>
@@ -1007,13 +1001,10 @@
 									<div class="card-body">
 										<div class="d-sm-flex mb-4 d-block justify-content-between align-items-center">
 											<div class="">
-												<h1 class=" mb-1 text-black font-w600" id="kpiClickSummaryTotal">867,123k</h1>
-												<svg class="me-2" width="18" height="10" viewBox="0 0 26 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-													<path d="M26 13L13 5.68248e-07L0 13" fill="#52B141"/>
-												</svg>
-												<span class="text-primary fs-14">+9% from last month</span>
+												<h1 class=" mb-1 text-black font-w600" id="kpiClickSummaryTotal">—</h1>
+												<span class="fs-14 text-muted" id="clickRangeLabel">Clics totales del período</span>
 											</div>
-											<a href="javascript:void(0);" class="text-primary btn border mt-sm-0 mt-3">Download CSV</a>
+											<a href="javascript:void(0);" class="text-primary btn border mt-sm-0 mt-3" id="downloadClicksCsv">Descargar CSV</a>
 										</div>
 										<div class="tab-content" id="myTabContent">
 											<div class="tab-pane fade show active" id="user" role="tabpanel">
