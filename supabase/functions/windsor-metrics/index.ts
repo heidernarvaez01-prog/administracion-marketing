@@ -96,6 +96,11 @@ serve(async (req) => {
     // pero por defecto usa el rango ya validado.
     const reqUrl = new URL(req.url);
     const datePreset = reqUrl.searchParams.get("date_preset") || DEFAULT_DATE_PRESET;
+    // ?raw=1: agrega dailyCampaignTotals + campaignNames al response (ver
+    // más abajo) — lo usa el motor de auditoría/pacing (Eclan) para hacer
+    // el match por nombre de campaña y sumar gasto día a día dentro del
+    // rango de cada audit_record, sin necesitar una tabla propia.
+    const includeRaw = reqUrl.searchParams.get("raw") === "1";
 
     const windsorUrl = new URL(WINDSOR_URL);
     windsorUrl.searchParams.set("api_key", WINDSOR_API_KEY);
@@ -328,6 +333,44 @@ serve(async (req) => {
       .sort((a, b) => b.spend - a.spend);
 
     // ------------------------------------------------------------------
+    // 8) Datos crudos por día y campaña — sólo si ?raw=1 (motor de
+    //    auditoría/pacing). Un registro por (fecha, campaña), sumando
+    //    todas las plataformas/adsets/anuncios de esa campaña ese día.
+    // ------------------------------------------------------------------
+    let dailyCampaignTotals: {
+      date: string; campaign: string; datasource: string;
+      clicks: number; spend: number; impressions: number;
+    }[] | undefined;
+    let campaignNames: string[] | undefined;
+
+    if (includeRaw) {
+      const porFechaCampaña = new Map<
+        string,
+        { date: string; campaign: string; datasource: string; clicks: number; spend: number; impressions: number }
+      >();
+      for (const r of rows) {
+        if (!r.campaign || !r.date) continue;
+        const key = `${r.date}::${r.campaign}`;
+        const acc = porFechaCampaña.get(key) ?? {
+          date: r.date,
+          campaign: r.campaign,
+          datasource: r.datasource,
+          clicks: 0,
+          spend: 0,
+          impressions: 0,
+        };
+        acc.clicks += num(r.clicks);
+        acc.spend += num(r.spend);
+        acc.impressions += num(r.impressions);
+        porFechaCampaña.set(key, acc);
+      }
+      dailyCampaignTotals = Array.from(porFechaCampaña.values())
+        .map((r) => ({ ...r, clicks: round(r.clicks, 0), spend: round(r.spend, 2), impressions: round(r.impressions, 0) }))
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      campaignNames = Array.from(new Set(rows.map((r) => r.campaign).filter(Boolean))).sort() as string[];
+    }
+
+    // ------------------------------------------------------------------
     // Shape final — siempre el mismo, haya o no plataformas conectadas.
     // ------------------------------------------------------------------
     return jsonResponse({
@@ -344,6 +387,7 @@ serve(async (req) => {
       engagementByPlatform,
       topAds,
       campaigns,
+      ...(includeRaw ? { dailyCampaignTotals, campaignNames } : {}),
     });
   } catch (error: unknown) {
     const mensaje = error instanceof Error ? error.message : "Error desconocido";

@@ -17,9 +17,10 @@
 	function fetchMetrics(options) {
 		options = options || {};
 		var url = SUPABASE_URL + "/functions/v1/windsor-metrics";
-		if (options.datePreset) {
-			url += "?date_preset=" + encodeURIComponent(options.datePreset);
-		}
+		var params = [];
+		if (options.datePreset) params.push("date_preset=" + encodeURIComponent(options.datePreset));
+		if (options.raw) params.push("raw=1");
+		if (params.length) url += "?" + params.join("&");
 
 		return fetch(url, {
 			headers: {
