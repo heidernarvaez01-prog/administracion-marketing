@@ -38,37 +38,27 @@
                             <div class="text-center mb-3">
                                 <a href="index.html"><img class="logo-auth" src="images/logo-full.png" alt=""></a>
                             </div>
-                            <h4 class="text-center mb-4">Sign in your account</h4>
-                            <form action="index.html">
+                            <h4 class="text-center mb-4">Iniciar sesión</h4>
+                            <div id="login-error" class="alert alert-danger py-2 px-3 d-none" role="alert"></div>
+                            <form id="login-form">
                                 <div class="form-group">
-                                    <label class="form-label" for="username">Username</label>
-                                    <input type="text" class="form-control" placeholder="Enter username" id="username">
+                                    <label class="form-label" for="email">Correo</label>
+                                    <input type="email" class="form-control" placeholder="tu@correo.com" id="email" required autocomplete="username">
                                 </div>
                                 <div class="mb-sm-4 mb-3 position-relative">
-                                    <label class="form-label" for="dz-password">Password</label>
-                                    <input type="password" id="dz-password" class="form-control" value="123456">
+                                    <label class="form-label" for="dz-password">Contraseña</label>
+                                    <input type="password" id="dz-password" class="form-control" required autocomplete="current-password">
                                     <span class="show-pass eye">
                                         <i class="fa fa-eye-slash"></i>
                                         <i class="fa fa-eye"></i>
                                     </span>
                                 </div>
-                                <div class="form-row d-flex flex-wrap justify-content-between mb-2">
-                                    <div class="form-group mb-sm-4 mb-1">
-                                        <div class="form-check custom-checkbox ms-1">
-                                            <input type="checkbox" class="form-check-input" id="basic_checkbox_1">
-                                            <label class="form-check-label" for="basic_checkbox_1">Remember my preference</label>
-                                        </div>
-                                    </div>
-                                    <div class="form-group ms-2">
-                                        <a href="page-forgot-password.html">Forgot Password?</a>
-                                    </div>
-                                </div>
                                 <div class="text-center">
-                                    <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+                                    <button type="submit" id="login-submit" class="btn btn-primary btn-block">Iniciar sesión</button>
                                 </div>
                             </form>
                             <div class="new-account mt-3">
-                                <p>Don't have an account? <a class="text-primary" href="./page-register.html">Sign up</a></p>
+                                <p>¿No tienes cuenta? <a class="text-primary" href="./page-register.html">Regístrate</a></p>
                             </div>
                         </div>
                     </div>
@@ -86,6 +76,11 @@
 	<script src="vendor/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
     <script src="js/custom.min.js"></script>
     <script src="js/deznav-init.js"></script>
+
+    <!-- Login real contra Supabase Auth -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+    <script src="js/dashboard/supabase-client.js"></script>
+    <script src="js/dashboard/login.js"></script>
 
 </body>
 
