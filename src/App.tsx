@@ -8,13 +8,11 @@ import { Menu, FileText, Network, CalendarClock } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import Index from "./pages/Index";
-import AudienceWindow from "./pages/AudienceWindow";
 import NotFound from "./pages/NotFound";
 
 // --- Portado desde Ad-Audit-Platform (login con prioridad + resto de la
-// plantilla, montado bajo /app; ver Paso 5 del pedido: "no eliminar nada,
-// solo agregar"). El resto del sitio ("/", "/audience") sigue exactamente
-// igual que antes. ---
+// plantilla, montado bajo /app). "/" sigue siendo Index.tsx (redirige al
+// panel de Eclan/Windsor.ai en public/eclan), sin tocar. ---
 import { useAuth } from "@/hooks/useAuth";
 import AppSidebar from "@/components/AppSidebar";
 import NotificationCenter from "@/components/NotificationCenter";
@@ -103,7 +101,6 @@ const App = () => (
         <Routes>
           {/* Sitio existente — sin cambios */}
           <Route path="/" element={<Index />} />
-          <Route path="/audience" element={<AudienceWindow />} />
 
           {/* Ad-Audit-Platform, portado completo bajo /app */}
           <Route path="/app" element={<AdAuditThemeScope />}>
