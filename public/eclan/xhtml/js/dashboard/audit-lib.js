@@ -136,7 +136,7 @@
 	 * @param {Array} dailyCampaignTotals el campo homónimo de
 	 *   windsor-metrics?raw=1 ({date, campaign, clicks, spend, impressions})
 	 */
-	function buildAuditRows(records, dailyCampaignTotals) {
+	function buildAuditRows(records, dailyCampaignTotals, thresholds, enabledTypes) {
 		var cutoff = getConsolidationCutoff();
 		dailyCampaignTotals = dailyCampaignTotals || [];
 
@@ -147,7 +147,7 @@
 			});
 			var cost = campaignRows.reduce(function (s, r) { return s + (isNaN(r.spend) ? 0 : r.spend); }, 0);
 			var metrics = calculateAuditMetrics(Number(rec.presupuesto_total), rec.fecha_inicio, rec.fecha_fin, rec.tipo_calendario, cost);
-			var alerts = generateAlerts(metrics, campaignRows);
+			var alerts = generateAlerts(metrics, campaignRows, thresholds, enabledTypes);
 			return Object.assign({}, rec, {
 				presupuesto_total: Number(rec.presupuesto_total),
 				metrics: metrics,
@@ -181,15 +181,16 @@
 		earlyDepletionDays: 2,
 	};
 
-	function generateAlerts(metrics, campaignRows, thresholds) {
+	function generateAlerts(metrics, campaignRows, thresholds, enabledTypes) {
 		var t = Object.assign({}, DEFAULT_THRESHOLDS, thresholds || {});
+		var isEnabled = function (type) { return !enabledTypes || enabledTypes.has(type); };
 		var alerts = [];
 		var inFlight = metrics.diasRestantes > 0 && metrics.diasTranscurridos > 0;
 		var lastConsolidated = isoDaysAgo(2);
 
 		// 1. Sobregasto X%+ sobre lo esperado
 		var overspendMultiplier = 1 + t.overspendPct / 100;
-		if (metrics.gastoEsperado > 0 && metrics.gastoActual >= metrics.gastoEsperado * overspendMultiplier) {
+		if (isEnabled("OVERSPEND_50") && metrics.gastoEsperado > 0 && metrics.gastoActual >= metrics.gastoEsperado * overspendMultiplier) {
 			var pctAbove = (((metrics.gastoActual - metrics.gastoEsperado) / metrics.gastoEsperado) * 100).toFixed(0);
 			alerts.push({
 				type: "OVERSPEND_50", severity: "danger", icon: "🔴",
@@ -198,7 +199,7 @@
 		}
 
 		// 2. Campaña sin gasto reciente
-		if (inFlight && metrics.diasTranscurridos >= t.notSpendingWindowDays) {
+		if (isEnabled("NOT_SPENDING") && inFlight && metrics.diasTranscurridos >= t.notSpendingWindowDays) {
 			var recentSpend = sumWindow(campaignRows, isoDaysAgo(t.notSpendingWindowDays + 1), lastConsolidated, function (r) { return r.spend; });
 			if (recentSpend === 0) {
 				alerts.push({
@@ -209,7 +210,7 @@
 		}
 
 		// 3. Campaña por finalizar
-		if (metrics.porcentajeTiempo >= t.endingSoonPctThreshold && metrics.diasRestantes > 0) {
+		if (isEnabled("ENDING_SOON") && metrics.porcentajeTiempo >= t.endingSoonPctThreshold && metrics.diasRestantes > 0) {
 			alerts.push({
 				type: "ENDING_SOON", severity: "info", icon: "🏁",
 				message: "La campaña va en " + metrics.porcentajeTiempo.toFixed(0) + "% de su cronograma (quedan " + metrics.diasRestantes + " día" + (metrics.diasRestantes === 1 ? "" : "s") + "). Saldo restante: $" + metrics.presupuestoRestante.toFixed(2) + " — planea la renovación o el cierre.",
@@ -217,7 +218,7 @@
 		}
 
 		// 4. Pico de costo (CPC/CPM) vs. semana anterior
-		if (inFlight) {
+		if (isEnabled("COST_SPIKE") && inFlight) {
 			var recentFrom = isoDaysAgo(4), prevFrom = isoDaysAgo(11), prevTo = isoDaysAgo(5);
 			var spikeMultiplier = 1 + t.costSpikePct / 100;
 			var rCost = sumWindow(campaignRows, recentFrom, lastConsolidated, function (r) { return r.spend; });
@@ -241,7 +242,7 @@
 		}
 
 		// 5. Presupuesto se agota antes de tiempo
-		if (inFlight && metrics.gastoDiarioActual > 0 && metrics.presupuestoRestante > 0) {
+		if (isEnabled("BUDGET_EARLY_DEPLETION") && inFlight && metrics.gastoDiarioActual > 0 && metrics.presupuestoRestante > 0) {
 			var daysUntilDepletion = metrics.presupuestoRestante / metrics.gastoDiarioActual;
 			var daysEarly = metrics.diasRestantes - daysUntilDepletion;
 			if (daysEarly >= t.earlyDepletionDays) {
