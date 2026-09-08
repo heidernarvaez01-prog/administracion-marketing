@@ -97,13 +97,16 @@
     /* === Portado desde Ad-Audit-Platform: tokens de estado semántico y
        colores de plataforma publicitaria. No colisionan con nada existente,
        quedan disponibles para todo el sitio. === */
-    --success: 151 69% 42%;
+    /* Valores reales de Eclan (--bs-success/--bs-warning/--bs-danger/--bs-info
+       en public/eclan/xhtml/css/style.css), no los provisionales de "Aside"
+       que tenían estas líneas antes. */
+    --success: 184 55% 57%;   /* #56C7CE */
     --success-foreground: 0 0% 100%;
-    --warning: 47 90% 51%;
+    --warning: 11 100% 65%;   /* #ff6d4d */
     --warning-foreground: 0 0% 0%;
-    --danger: 350 87% 52%;
+    --danger: 0 100% 60%;     /* #FF3333 */
     --danger-foreground: 0 0% 100%;
-    --info: 207 90% 54%;
+    --info: 241 55% 57%;      /* #5856CE */
     --info-foreground: 0 0% 100%;
     --meta: 214 89% 52%;
     --facebook: 221 44% 41%;
@@ -153,11 +156,12 @@
     --slide-bg: 215 28% 17%;
     --grid-line: 217 19% 27%;
 
-    /* Portado desde Ad-Audit-Platform (variantes dark de los tokens de
-       estado agregados arriba) */
-    --success: 151 60% 40%;
-    --warning: 47 85% 52%;
-    --info: 207 85% 55%;
+    /* Variantes dark de los tokens de estado agregados arriba — mismos
+       valores reales de Eclan, sólo se sostienen en modo oscuro */
+    --success: 184 50% 52%;
+    --warning: 11 90% 60%;
+    --danger: 0 90% 58%;
+    --info: 241 50% 62%;
   }
 }
 
