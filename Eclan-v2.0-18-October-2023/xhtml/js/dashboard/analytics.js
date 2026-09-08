@@ -116,23 +116,44 @@
 		$("#kpiSpendToday").text(WindsorClient.money(data.kpis.spendToday));
 		$("#kpiClickSummaryTotal").text(WindsorClient.compact(data.kpis.totalClicks));
 		$("#kpiSpendSummaryTotal").text(WindsorClient.money(data.kpis.totalSpend));
+
+		var labels = (data.clickSummary && data.clickSummary.labels) || [];
+		var desde = labels[0];
+		var hasta = labels[labels.length - 1];
+		var rango = desde && hasta ? WindsorClient.longDate(desde) + " – " + WindsorClient.longDate(hasta) : "";
+
+		$("#rangeSubtitle").text(rango ? "Datos reales de Windsor.ai · " + rango : "Datos reales de Windsor.ai");
+		$("#clickRangeLabel").text("Clics totales del período");
+		$("#spendRangeLabel").text("Gasto total del período");
+
+		var generado = new Date(data.generatedAt || Date.now());
+		$("#headerTime").text(generado.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }));
+		$("#headerDate").text("Actualizado " + generado.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }));
 	}
 
-	function renderClickSummaryChart(clickSummary) {
-		var el = document.getElementById("activity");
+	function axisLabels(labels) {
+		return labels.map(WindsorClient.shortDate);
+	}
+
+	function lineChart(canvasId, labels, values, color, label, moneyAxis) {
+		var el = document.getElementById(canvasId);
 		if (!el) return;
 		el.height = 300;
 
-		var config = {
+		var existing = Chart.getChart(el.id);
+		if (existing) existing.destroy();
+
+		new Chart(el.getContext("2d"), {
 			type: "line",
 			data: {
-				labels: clickSummary.labels,
+				labels: axisLabels(labels),
 				datasets: [
 					{
-						label: "Clicks",
-						data: clickSummary.data,
-						borderColor: "rgba(26, 51, 213, 0)",
-						backgroundColor: "rgba(82, 177, 65, 1)",
+						label: label,
+						data: values,
+						borderColor: color,
+						borderWidth: 2,
+						backgroundColor: color.replace("rgb(", "rgba(").replace(")", ", 0.15)"),
 						fill: true,
 					},
 				],
@@ -140,66 +161,56 @@
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				elements: { point: { radius: 0 }, line: { tension: 0.4 } },
-				plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
-				scales: {
-					y: { ticks: { fontColor: "#3e4954", beginAtZero: true } },
-					x: { gridLines: { display: false }, ticks: { fontColor: "#3e4954" } },
-				},
-			},
-		};
-
-		var existing = Chart.getChart(el.id);
-		if (existing) existing.destroy();
-		new Chart(el.getContext("2d"), config);
-	}
-
-	function renderSpendSummaryChart(spendSummary) {
-		var el = document.getElementById("activity2");
-		if (!el) return;
-		el.height = 300;
-
-		var config = {
-			type: "line",
-			data: {
-				labels: spendSummary.labels,
-				datasets: [
-					{
-						label: "Gasto",
-						data: spendSummary.data,
-						borderColor: "rgba(26, 51, 213, 0)",
-						backgroundColor: "rgba(255, 142, 38, 1)",
-						fill: true,
+				animation: false,
+				elements: { point: { radius: 0, hitRadius: 12 }, line: { tension: 0.4 } },
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						mode: "index",
+						intersect: false,
+						callbacks: {
+							label: function (ctx) {
+								return label + ": " + (moneyAxis ? WindsorClient.money(ctx.parsed.y) : WindsorClient.compact(ctx.parsed.y));
+							},
+						},
 					},
-				],
-			},
-			options: {
-				responsive: true,
-				maintainAspectRatio: false,
-				elements: { line: { tension: 0.4 } },
-				plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
+				},
 				scales: {
-					y: { ticks: { fontColor: "#3e4954", beginAtZero: true } },
-					x: { gridLines: { display: false }, ticks: { fontColor: "#3e4954" } },
+					y: {
+						beginAtZero: true,
+						border: { display: false },
+						grid: { color: "rgba(0,0,0,0.05)" },
+						ticks: {
+							color: "#7e7e7e",
+							callback: function (v) {
+								return moneyAxis ? WindsorClient.money(v) : WindsorClient.compact(v);
+							},
+						},
+					},
+					x: {
+						grid: { display: false },
+						border: { display: false },
+						ticks: { color: "#7e7e7e", maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+					},
 				},
 			},
-		};
-
-		var existing = Chart.getChart(el.id);
-		if (existing) existing.destroy();
-		new Chart(el.getContext("2d"), config);
+		});
 	}
+
+	var apexInstances = {};
 
 	function renderGoalStatistic(objectiveBreakdown, ctrGauge) {
 		var circleEl = document.querySelector("#chartCircle");
 		if (circleEl) {
+			if (apexInstances.circle) apexInstances.circle.destroy();
 			circleEl.innerHTML = "";
-			var optionsCircle = {
-				chart: { type: "radialBar", height: 370, offsetY: 0, offsetX: 0 },
+			apexInstances.circle = new ApexCharts(circleEl, {
+				chart: { type: "radialBar", height: 340, animations: { enabled: false } },
 				plotOptions: {
 					radialBar: {
 						hollow: { margin: 0, size: "35%", background: "transparent" },
-						track: { show: true, background: "#e1e5ff", strokeWidth: "10%", opacity: 1, margin: 17 },
+						track: { show: true, background: "#eef0f7", strokeWidth: "10%", opacity: 1, margin: 14 },
+						dataLabels: { name: { fontSize: "14px" }, value: { fontSize: "18px", formatter: function (v) { return v + "%"; } } },
 					},
 				},
 				fill: { opacity: 1 },
@@ -207,33 +218,34 @@
 				colors: ["#FF285C", "#5856CE", "#56C7CE"],
 				series: objectiveBreakdown.series.length ? objectiveBreakdown.series : [0],
 				labels: objectiveBreakdown.labels.length ? objectiveBreakdown.labels : ["Sin datos"],
-				legend: { show: false },
-			};
-			new ApexCharts(circleEl, optionsCircle).render();
+				legend: { show: true, position: "bottom", fontSize: "13px", markers: { radius: 12 } },
+			});
+			apexInstances.circle.render();
 		}
 
 		var ratioEl = document.querySelector("#chartratio");
 		if (ratioEl) {
+			if (apexInstances.ratio) apexInstances.ratio.destroy();
 			ratioEl.innerHTML = "";
-			var options = {
+			apexInstances.ratio = new ApexCharts(ratioEl, {
 				series: [ctrGauge],
-				chart: { height: 250, type: "radialBar", toolbar: { show: false } },
+				chart: { height: 230, type: "radialBar", toolbar: { show: false }, animations: { enabled: false } },
 				plotOptions: {
 					radialBar: {
 						startAngle: -100,
 						endAngle: 260,
 						hollow: { margin: 0, size: "70%", background: "#fff" },
-						track: { background: "#e1e5ff", strokeWidth: "100%", margin: 0 },
+						track: { background: "#eef0f7", strokeWidth: "100%", margin: 0 },
 						dataLabels: {
 							show: true,
-							name: { offsetY: -10, show: true, color: "#888", fontSize: "17px" },
+							name: { offsetY: -10, show: true, color: "#888", fontSize: "15px" },
 							value: {
 								offsetY: -4,
 								formatter: function (val) {
-									return parseFloat(val).toFixed(1) + "%";
+									return parseFloat(val).toFixed(2) + "%";
 								},
 								color: "#111",
-								fontSize: "30px",
+								fontSize: "28px",
 								show: true,
 							},
 						},
@@ -254,40 +266,72 @@
 				},
 				stroke: { dashArray: 4 },
 				labels: ["CTR"],
-			};
-			new ApexCharts(ratioEl, options).render();
+			});
+			apexInstances.ratio.render();
 		}
 	}
 
 	function renderEngagementChart(engagement) {
 		var el = document.querySelector("#columnChart");
 		if (!el) return;
+		if (apexInstances.column) apexInstances.column.destroy();
 		el.innerHTML = "";
 
-		var options = {
+		apexInstances.column = new ApexCharts(el, {
 			series: engagement.series,
-			chart: { type: "bar", height: 250, stacked: true, toolbar: { show: false } },
-			plotOptions: { bar: { horizontal: false, columnWidth: "20%" } },
+			chart: { type: "bar", height: 250, stacked: true, toolbar: { show: false }, animations: { enabled: false } },
+			plotOptions: { bar: { horizontal: false, columnWidth: "45%", borderRadius: 4 } },
 			colors: ["#ff285c", "#5856ce", "#56c7ce", "#ff9f00", "#2b98d6"],
-			xaxis: { categories: engagement.categories },
+			xaxis: {
+				categories: axisLabels(engagement.categories),
+				axisBorder: { show: false },
+				axisTicks: { show: false },
+				labels: { style: { colors: "#7e7e7e" }, hideOverlappingLabels: true },
+			},
 			yaxis: { show: false },
 			grid: { show: false },
 			dataLabels: { enabled: false },
 			legend: { position: "bottom", offsetY: 5 },
 			fill: { opacity: 1 },
-		};
+			tooltip: { y: { formatter: function (v) { return WindsorClient.compact(v) + " clics"; } } },
+		});
+		apexInstances.column.render();
+	}
 
-		new ApexCharts(el, options).render();
+	function toCsv(labels, values, header) {
+		var lines = [header];
+		for (var i = 0; i < labels.length; i++) lines.push(labels[i] + "," + values[i]);
+		return lines.join("\n");
+	}
+
+	function download(name, contents) {
+		var blob = new Blob([contents], { type: "text/csv;charset=utf-8;" });
+		var a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = name;
+		a.click();
+		URL.revokeObjectURL(a.href);
+	}
+
+	var currentPreset = "last_90d";
+	var lastData = null;
+
+	function setLoading(on) {
+		$("#rangeSubtitle").text(on ? "Cargando datos de Windsor.ai…" : $("#rangeSubtitle").text());
+		$(".range-tabs .nav-link").css("opacity", on ? 0.5 : 1);
 	}
 
 	function loadRealData() {
 		if (typeof WindsorClient === "undefined") return;
+		setLoading(true);
 
-		WindsorClient.fetchMetrics({ datePreset: "last_90d" })
+		WindsorClient.fetchMetrics({ datePreset: currentPreset })
 			.then(function (data) {
+				lastData = data;
+				setLoading(false);
 				renderKpis(data);
-				renderClickSummaryChart(data.clickSummary);
-				renderSpendSummaryChart(data.spendSummary);
+				lineChart("activity", data.clickSummary.labels, data.clickSummary.data, "rgb(82, 177, 65)", "Clics", false);
+				lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(255, 142, 38)", "Gasto", true);
 				renderGoalStatistic(data.objectiveBreakdown, data.ctrGauge);
 				renderPlatformBreakdown(data.plataformas);
 				renderEngagementChart(data.engagementByPlatform);
@@ -295,7 +339,9 @@
 				renderAdList("#trendingAdsList", data.topAds.slice(0, 3).reverse(), "Clics");
 			})
 			.catch(function (err) {
+				setLoading(false);
 				console.error("windsor-metrics:", err);
+				$("#rangeSubtitle").text("No se pudieron cargar los datos de Windsor.ai");
 				var $container = $("#platformBreakdownList");
 				if ($container.length) {
 					$container.html(
@@ -310,6 +356,27 @@
 	}
 
 	jQuery(window).on("load", function () {
+		$(document).on("click", ".range-tabs .nav-link", function () {
+			var preset = $(this).data("preset");
+			if (!preset || preset === currentPreset) return;
+			currentPreset = preset;
+			$(".range-tabs .nav-link").removeClass("active");
+			$('.range-tabs .nav-link[data-preset="' + preset + '"]').addClass("active");
+			loadRealData();
+		});
+
+		$(document).on("click", "#reloadMetrics", function () {
+			loadRealData();
+		});
+
+		$(document).on("click", "#downloadClicksCsv", function () {
+			if (lastData) download("clics.csv", toCsv(lastData.clickSummary.labels, lastData.clickSummary.data, "fecha,clics"));
+		});
+
+		$(document).on("click", "#downloadSpendCsv", function () {
+			if (lastData) download("gasto.csv", toCsv(lastData.spendSummary.labels, lastData.spendSummary.data, "fecha,gasto"));
+		});
+
 		setTimeout(loadRealData, 300);
 	});
 })(jQuery);
