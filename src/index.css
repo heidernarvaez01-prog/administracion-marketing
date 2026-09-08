@@ -1,9 +1,29 @@
 /* IBM Plex for clean enterprise typography - inspired by Carbon Design System */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+/* JetBrains Mono - portado desde Ad-Audit-Platform (usado en tablas de métricas) */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Gudea — tipografía de Ad-Audit-Platform, portada desde la plantilla "Aside".
+   Sólo se usa dentro del scope .ad-audit-theme (ver más abajo), no afecta
+   la tipografía IBM Plex del resto del sitio. */
+@font-face {
+  font-family: 'Gudea';
+  src: url('/fonts/gudea/400.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Gudea';
+  src: url('/fonts/gudea/700.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 @layer base {
   :root {
@@ -86,6 +106,30 @@
     --grid-line: 220 13% 91%;
     --comment-pin: 36 100% 50%;
     --comment-pin-resolved: 145 63% 42%;
+
+    /* === Portado desde Ad-Audit-Platform: tokens de estado semántico y
+       colores de plataforma publicitaria. No colisionan con nada existente,
+       quedan disponibles para todo el sitio. === */
+    --success: 151 69% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 47 90% 51%;
+    --warning-foreground: 0 0% 0%;
+    --danger: 350 87% 52%;
+    --danger-foreground: 0 0% 100%;
+    --info: 207 90% 54%;
+    --info-foreground: 0 0% 100%;
+    --meta: 214 89% 52%;
+    --facebook: 221 44% 41%;
+    --twitter: 203 89% 53%;
+    --google: 4 90% 58%;
+    --tiktok: 0 0% 0%;
+    --linkedin: 201 100% 35%;
+    --instagram: 340 75% 54%;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1), 0 -1px 0 rgba(0, 0, 0, 0.02);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.15), 0 -1px 0 rgba(0, 0, 0, 0.02);
+    --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.1), 0 -1px 0 rgba(0, 0, 0, 0.02);
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 -1px 0 rgba(0, 0, 0, 0.02);
+    --font-mono: 'JetBrains Mono', monospace;
   }
 
   .dark {
@@ -121,6 +165,89 @@
     --canvas-bg: 221 39% 8%;
     --slide-bg: 215 28% 17%;
     --grid-line: 217 19% 27%;
+
+    /* Portado desde Ad-Audit-Platform (variantes dark de los tokens de
+       estado agregados arriba) */
+    --success: 151 60% 40%;
+    --warning: 47 85% 52%;
+    --info: 207 85% 55%;
+  }
+}
+
+@layer base {
+  /* ================================================================
+     Scope de tema de Ad-Audit-Platform ("Aside"), portado con prioridad
+     de login/auth. Se aplica sólo dentro de la clase .ad-audit-theme
+     (montada en la raíz de /app en App.tsx) para no pisar los tokens
+     --primary, --background, --sidebar-* (etc.) del resto del sitio (Index,
+     slideshow, Eclan). Nuevo, no reemplaza nada existente.
+     ================================================================ */
+  .ad-audit-theme {
+    --background: 210 25% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 180 48% 52%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 180 48% 65%;
+    --secondary: 191 91% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 180 45% 95%;
+    --accent-foreground: 180 50% 28%;
+    --destructive: 350 87% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 91%;
+    --input: 214 20% 91%;
+    --ring: 180 48% 52%;
+    --sidebar-background: 217 35% 14%;
+    --sidebar-foreground: 210 25% 85%;
+    --sidebar-primary: 180 48% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 30% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 217 30% 19%;
+    --sidebar-ring: 180 48% 52%;
+    --sidebar-glow: 180 48% 52%;
+    --sidebar-hover: 217 35% 17%;
+
+    font-family: 'Gudea', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.875rem;
+  }
+
+  .dark .ad-audit-theme,
+  .ad-audit-theme.dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 180 45% 55%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 191 60% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 350 75% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 180 45% 55%;
+    --sidebar-background: 222 47% 3%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 180 45% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 12%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 33% 12%;
+    --sidebar-ring: 180 45% 55%;
+    --sidebar-glow: 180 45% 55%;
   }
 }
 
@@ -317,4 +444,157 @@
 
 .animate-collapse {
   animation: collapseIn 0.2s ease-out forwards;
+}
+
+/* ======================================================================
+   Portado desde Ad-Audit-Platform. Se omiten a propósito .animate-fade-in
+   y .animate-scale-in (y sus @keyframes fadeIn/scaleIn) porque ya existen
+   arriba con el mismo nombre — se reusan las de este archivo en vez de
+   pisarlas. Todo lo demás es nuevo, sin colisión.
+   ====================================================================== */
+@layer utilities {
+  .font-mono-data {
+    font-family: var(--font-mono);
+  }
+
+  /* Premium Glass Effects */
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .glass-border {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Glow Effects */
+  .glow-sm {
+    box-shadow: 0 0 20px -5px currentColor;
+  }
+
+  .glow-md {
+    box-shadow: 0 0 30px -5px currentColor;
+  }
+
+  /* Smooth Transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .transition-spring {
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* Scale Animations */
+  .hover-scale {
+    @apply transition-transform duration-200 ease-out hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .hover-lift {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg;
+  }
+
+  @keyframes adAuditSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in {
+    animation: adAuditSlideIn 0.3s ease-out;
+  }
+
+  @keyframes adAuditShimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent, hsl(var(--muted) / 0.6), transparent);
+    background-size: 200% 100%;
+    animation: adAuditShimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Card polish — operational surfaces */
+  .card-elevated {
+    @apply bg-card border border-border rounded-xl shadow-sm transition-all duration-200;
+  }
+  .card-elevated:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Pulse Effect */
+  .pulse-glow {
+    @apply animate-pulse;
+    box-shadow: 0 0 20px -5px currentColor;
+  }
+
+  /* Radial Gradient */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+
+  /* Always-visible horizontal scrollbar (wide tables) */
+  .scrollbar-visible {
+    overflow-x: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.5) hsl(var(--muted) / 0.4);
+  }
+
+  .scrollbar-visible::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  .scrollbar-visible::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.4);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-visible::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.5);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-visible::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.7);
+  }
+
+  /* Hide a scrollbar while keeping the element scrollable (content pane
+     under a synced sticky scrollbar) */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Social platform gradients — derived from the platform tokens above */
+  .bg-facebook-gradient {
+    background: linear-gradient(135deg, hsl(var(--facebook)) 0%, hsl(var(--facebook) / 0.8) 100%);
+  }
+  .bg-twitter-gradient {
+    background: linear-gradient(135deg, hsl(var(--twitter)) 0%, hsl(var(--twitter) / 0.8) 100%);
+  }
+  .bg-linkedin-gradient {
+    background: linear-gradient(135deg, hsl(var(--linkedin)) 0%, hsl(var(--linkedin) / 0.8) 100%);
+  }
+  .bg-instagram-gradient {
+    background: linear-gradient(135deg, hsl(var(--instagram)) 0%, hsl(var(--instagram) / 0.8) 100%);
+  }
+
+  /* CoreUI transitions */
+  .transition-coreui {
+    transition: all 0.2s ease-in-out;
+  }
+
+  /* Metric card accent border */
+  .border-t-accent {
+    border-top-width: 4px;
+  }
 }

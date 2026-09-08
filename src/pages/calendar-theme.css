@@ -1,0 +1,86 @@
+/*
+ * Calendar theme — ported from the "Aside" template's fullcalendar.theme.css
+ * (html/libs/fullcalendar/dist/fullcalendar.theme.css), rebuilt on this app's
+ * design tokens instead of hardcoded hex values. Scoped under .app-calendar
+ * so it never leaks into any other UI.
+ */
+
+.app-calendar .fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-page-bg-color: hsl(var(--card));
+  --fc-neutral-bg-color: hsl(var(--muted) / 0.4);
+  --fc-list-event-hover-bg-color: hsl(var(--muted));
+  --fc-today-bg-color: hsl(var(--primary) / 0.08);
+  --fc-event-border-color: transparent;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+/* Header toolbar — the template's cyan-blue bar (#03a9f4 ≈ our --info token) */
+.app-calendar .fc-header-toolbar {
+  background: hsl(var(--info));
+  border-radius: 0.5rem 0.5rem 0 0;
+  padding: 0.75rem 1rem;
+  margin: 0 !important;
+}
+
+.app-calendar .fc-toolbar-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: hsl(var(--info-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.app-calendar .fc-button {
+  background: hsl(var(--info-foreground) / 0.15);
+  border: none;
+  color: hsl(var(--info-foreground));
+  box-shadow: none;
+  text-shadow: none;
+  border-radius: 0.25rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+.app-calendar .fc-button:hover,
+.app-calendar .fc-button:focus {
+  background: hsl(var(--info-foreground) / 0.25);
+  box-shadow: none;
+}
+.app-calendar .fc-button-primary:not(:disabled).fc-button-active,
+.app-calendar .fc-button-primary:not(:disabled):active {
+  background: hsl(var(--info-foreground) / 0.3);
+  color: hsl(var(--info-foreground));
+}
+.app-calendar .fc-button:disabled {
+  opacity: 0.4;
+}
+
+.app-calendar .fc-scrollgrid {
+  border-color: hsl(var(--border));
+  border-radius: 0 0 0.75rem 0.75rem;
+  overflow: hidden;
+}
+
+.app-calendar .fc-daygrid-day-number,
+.app-calendar .fc-col-header-cell-cushion,
+.app-calendar .fc-timegrid-slot-label-cushion {
+  color: hsl(var(--foreground));
+}
+
+.app-calendar .fc-col-header-cell {
+  background: hsl(var(--muted) / 0.4);
+}
+
+.app-calendar .fc-day-today {
+  background: hsl(var(--primary) / 0.08) !important;
+}
+
+.app-calendar .fc-event {
+  border-radius: 0.25rem;
+  padding: 1px 4px;
+  font-size: 0.72rem;
+  border: none;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+}

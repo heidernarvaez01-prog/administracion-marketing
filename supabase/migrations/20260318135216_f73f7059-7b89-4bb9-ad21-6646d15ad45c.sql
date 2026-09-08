@@ -1,0 +1,1 @@
+ALTER TABLE public.audit_records ADD COLUMN platform text;

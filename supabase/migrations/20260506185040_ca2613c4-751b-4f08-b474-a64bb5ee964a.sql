@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.sheet_sync_data; DROP TABLE IF EXISTS public.sheet_sync_log;

@@ -111,6 +111,30 @@ export default {
           pin: "hsl(var(--comment-pin))",
           "pin-resolved": "hsl(var(--comment-pin-resolved))",
         },
+        // Portado desde Ad-Audit-Platform: tokens de estado + plataformas
+        // publicitarias, usados por AuditTable/PacingBar/MetricCard/etc.
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        danger: {
+          DEFAULT: "hsl(var(--danger))",
+          foreground: "hsl(var(--danger-foreground))",
+        },
+        platform: {
+          meta: "hsl(var(--meta))",
+          google: "hsl(var(--google))",
+          tiktok: "hsl(var(--tiktok))",
+          linkedin: "hsl(var(--linkedin))",
+        },
       },
       // Spacing scale for slides (based on 8px grid)
       spacing: {
@@ -148,6 +172,20 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        // Portado desde Ad-Audit-Platform (nombres únicos, no pisan
+        // "fade-in"/"scale-in" que ya existían acá)
+        "fade-in-up": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "slide-in-right": {
+          from: { transform: "translateX(-100%)" },
+          to: { transform: "translateX(0)" },
+        },
+        "glow-pulse": {
+          "0%, 100%": { opacity: "0.5", transform: "scale(1)" },
+          "50%": { opacity: "0.8", transform: "scale(1.2)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -155,6 +193,9 @@ export default {
         "fade-in": "fadeIn 0.3s ease-out",
         "slide-up": "slideUp 0.4s ease-out",
         "scale-in": "scaleIn 0.2s ease-out",
+        "fade-in-up": "fade-in-up 0.4s ease-out",
+        "slide-in-right": "slide-in-right 0.3s ease-out",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
       },
     },
   },

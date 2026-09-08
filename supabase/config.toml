@@ -4,3 +4,34 @@ project_id = "szdivobcbdkiszgrizic"
 # Las páginas Eclan (HTML estático) llaman a esta función solo con la
 # apikey pública (anon), sin sesión de usuario logueado.
 verify_jwt = false
+
+# --- Portado desde Ad-Audit-Platform (login, auditorías, alertas, IA) ---
+[functions.sync-meta-datos]
+verify_jwt = false
+
+[functions.alert-dispatch]
+# Auth se maneja dentro de la función: un "send now" manual requiere un
+# JWT de usuario real (supabase.auth.getUser), y la corrida por cron
+# requiere el header x-cron-secret en su lugar.
+verify_jwt = false
+
+[functions.process-email-queue]
+verify_jwt = true
+
+[functions.send-transactional-email]
+verify_jwt = true
+
+[functions.preview-transactional-email]
+verify_jwt = false
+
+[functions.handle-email-unsubscribe]
+verify_jwt = false
+
+[functions.handle-email-suppression]
+verify_jwt = false
+
+[functions.projection-cluster]
+verify_jwt = true
+
+[functions.weekly-report]
+verify_jwt = false
