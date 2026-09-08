@@ -98,12 +98,11 @@ serve(async (req) => {
     const datePreset = reqUrl.searchParams.get("date_preset") || DEFAULT_DATE_PRESET;
 
     const windsorUrl = new URL(WINDSOR_URL);
+    windsorUrl.searchParams.set("api_key", WINDSOR_API_KEY);
     windsorUrl.searchParams.set("fields", WINDSOR_FIELDS);
     windsorUrl.searchParams.set("date_preset", datePreset);
 
-    const windsorRes = await fetch(windsorUrl.toString(), {
-      headers: { "X-Api-Key": WINDSOR_API_KEY },
-    });
+    const windsorRes = await fetch(windsorUrl.toString());
 
     if (!windsorRes.ok) {
       const detalle = await windsorRes.text().catch(() => "");
