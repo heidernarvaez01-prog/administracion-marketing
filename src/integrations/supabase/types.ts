@@ -101,45 +101,6 @@ export type Database = {
         }
         Relationships: []
       }
-      alert_settings: {
-        Row: {
-          created_at: string
-          email_recipients: string[]
-          enabled: boolean
-          id: string
-          last_sent_at: string | null
-          notify_frequency: string
-          only_critical: boolean
-          pacing_threshold_pct: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          email_recipients?: string[]
-          enabled?: boolean
-          id?: string
-          last_sent_at?: string | null
-          notify_frequency?: string
-          only_critical?: boolean
-          pacing_threshold_pct?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email_recipients?: string[]
-          enabled?: boolean
-          id?: string
-          last_sent_at?: string | null
-          notify_frequency?: string
-          only_critical?: boolean
-          pacing_threshold_pct?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       audit_clients: {
         Row: {
           created_at: string
@@ -178,7 +139,7 @@ export type Database = {
       }
       audit_records: {
         Row: {
-          account_id: string
+          account_id: string | null
           campaign_name: string
           client_id: string | null
           created_at: string
@@ -192,7 +153,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          account_id: string
+          account_id?: string | null
           campaign_name: string
           client_id?: string | null
           created_at?: string
@@ -206,7 +167,7 @@ export type Database = {
           user_id: string
         }
         Update: {
-          account_id?: string
+          account_id?: string | null
           campaign_name?: string
           client_id?: string | null
           created_at?: string
@@ -249,7 +210,7 @@ export type Database = {
           necesidad_principal: string | null
           palabras_marca: string | null
           personalidad_marca: string | null
-          presupuesto_campana: number | null
+          presupuesto_campana: string | null
           promesa_marca: string | null
           publico_objetivo: string | null
           reasons_why: string | null
@@ -277,7 +238,7 @@ export type Database = {
           necesidad_principal?: string | null
           palabras_marca?: string | null
           personalidad_marca?: string | null
-          presupuesto_campana?: number | null
+          presupuesto_campana?: string | null
           promesa_marca?: string | null
           publico_objetivo?: string | null
           reasons_why?: string | null
@@ -305,7 +266,7 @@ export type Database = {
           necesidad_principal?: string | null
           palabras_marca?: string | null
           personalidad_marca?: string | null
-          presupuesto_campana?: number | null
+          presupuesto_campana?: string | null
           promesa_marca?: string | null
           publico_objetivo?: string | null
           reasons_why?: string | null
@@ -317,50 +278,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "brand_briefs_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "audit_clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      campaign_ai_insights: {
-        Row: {
-          campaign_name: string
-          client_id: string | null
-          created_at: string
-          finding: string
-          id: string
-          metrics_snapshot: Json
-          recommendation: string
-          severity: string
-          user_id: string
-        }
-        Insert: {
-          campaign_name: string
-          client_id?: string | null
-          created_at?: string
-          finding: string
-          id?: string
-          metrics_snapshot?: Json
-          recommendation: string
-          severity: string
-          user_id: string
-        }
-        Update: {
-          campaign_name?: string
-          client_id?: string | null
-          created_at?: string
-          finding?: string
-          id?: string
-          metrics_snapshot?: Json
-          recommendation?: string
-          severity?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaign_ai_insights_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "audit_clients"
@@ -412,93 +329,6 @@ export type Database = {
           },
         ]
       }
-      email_send_log: {
-        Row: {
-          created_at: string
-          error_message: string | null
-          id: string
-          message_id: string | null
-          metadata: Json | null
-          recipient_email: string
-          status: string
-          template_name: string
-        }
-        Insert: {
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          message_id?: string | null
-          metadata?: Json | null
-          recipient_email: string
-          status: string
-          template_name: string
-        }
-        Update: {
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          message_id?: string | null
-          metadata?: Json | null
-          recipient_email?: string
-          status?: string
-          template_name?: string
-        }
-        Relationships: []
-      }
-      email_send_state: {
-        Row: {
-          auth_email_ttl_minutes: number
-          batch_size: number
-          id: number
-          retry_after_until: string | null
-          send_delay_ms: number
-          transactional_email_ttl_minutes: number
-          updated_at: string
-        }
-        Insert: {
-          auth_email_ttl_minutes?: number
-          batch_size?: number
-          id?: number
-          retry_after_until?: string | null
-          send_delay_ms?: number
-          transactional_email_ttl_minutes?: number
-          updated_at?: string
-        }
-        Update: {
-          auth_email_ttl_minutes?: number
-          batch_size?: number
-          id?: number
-          retry_after_until?: string | null
-          send_delay_ms?: number
-          transactional_email_ttl_minutes?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      email_unsubscribe_tokens: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          token: string
-          used_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          token: string
-          used_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          token?: string
-          used_at?: string | null
-        }
-        Relationships: []
-      }
       meta_datos: {
         Row: {
           account_id: string | null
@@ -539,7 +369,7 @@ export type Database = {
           link_clicks: number | null
           objective: string | null
           optimization_goal: string | null
-          plataforma: string | null
+          plataforma: string
           platform_specific: Json
           publisher_platform: string | null
           purchase_roas: number | null
@@ -592,7 +422,7 @@ export type Database = {
           link_clicks?: number | null
           objective?: string | null
           optimization_goal?: string | null
-          plataforma?: string | null
+          plataforma?: string
           platform_specific?: Json
           publisher_platform?: string | null
           purchase_roas?: number | null
@@ -645,7 +475,7 @@ export type Database = {
           link_clicks?: number | null
           objective?: string | null
           optimization_goal?: string | null
-          plataforma?: string | null
+          plataforma?: string
           platform_specific?: Json
           publisher_platform?: string | null
           purchase_roas?: number | null
@@ -661,90 +491,27 @@ export type Database = {
         }
         Relationships: []
       }
-      notification_channels: {
+      presenter_notes: {
         Row: {
-          channel_type: string
-          config: Json
+          content: string
           created_at: string
-          enabled: boolean
           id: string
+          slide_id: string
           updated_at: string
-          user_id: string
         }
         Insert: {
-          channel_type: string
-          config?: Json
+          content?: string
           created_at?: string
-          enabled?: boolean
           id?: string
+          slide_id: string
           updated_at?: string
-          user_id: string
         }
         Update: {
-          channel_type?: string
-          config?: Json
+          content?: string
           created_at?: string
-          enabled?: boolean
           id?: string
+          slide_id?: string
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          alert_type: string
-          campaign_name: string
-          created_at: string
-          id: string
-          message: string
-          read_at: string | null
-          severity: string
-          user_id: string
-        }
-        Insert: {
-          alert_type: string
-          campaign_name: string
-          created_at?: string
-          id?: string
-          message: string
-          read_at?: string | null
-          severity: string
-          user_id: string
-        }
-        Update: {
-          alert_type?: string
-          campaign_name?: string
-          created_at?: string
-          id?: string
-          message?: string
-          read_at?: string | null
-          severity?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      suppressed_emails: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          metadata: Json | null
-          reason: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          metadata?: Json | null
-          reason: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          metadata?: Json | null
-          reason?: string
         }
         Relationships: []
       }
@@ -813,44 +580,11 @@ export type Database = {
           },
         ]
       }
-      presenter_notes: {
-        Row: {
-          content: string
-          created_at: string
-          id: string
-          slide_id: string
-          updated_at: string
-        }
-        Insert: {
-          content?: string
-          created_at?: string
-          id?: string
-          slide_id: string
-          updated_at?: string
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          id?: string
-          slide_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      delete_email: {
-        Args: { message_id: number; queue_name: string }
-        Returns: boolean
-      }
-      email_queue_dispatch: { Args: never; Returns: undefined }
-      enqueue_email: {
-        Args: { payload: Json; queue_name: string }
-        Returns: number
-      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -858,34 +592,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      move_to_dlq: {
-        Args: {
-          dlq_name: string
-          message_id: number
-          payload: Json
-          source_queue: string
-        }
-        Returns: number
-      }
-      read_email_batch: {
-        Args: { batch_size: number; queue_name: string; vt: number }
-        Returns: {
-          message: Json
-          msg_id: number
-          read_ct: number
-        }[]
-      }
     }
     Enums: {
-      ad_platform:
-        | "meta"
-        | "google"
-        | "tiktok"
-        | "linkedin"
-        | "extra1"
-        | "extra2"
       app_role: "admin" | "user"
-      lab_days_type: "mon_fri" | "mon_sat" | "all"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1013,9 +722,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      ad_platform: ["meta", "google", "tiktok", "linkedin", "extra1", "extra2"],
       app_role: ["admin", "user"],
-      lab_days_type: ["mon_fri", "mon_sat", "all"],
     },
   },
 } as const
