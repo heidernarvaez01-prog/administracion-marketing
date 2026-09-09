@@ -14,6 +14,483 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_assignments: {
+        Row: {
+          account_id: string
+          account_name: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          platform: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          account_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          account_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      alert_events: {
+        Row: {
+          alert_type: string
+          campaign_name: string
+          id: string
+          last_triggered_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          campaign_name: string
+          id?: string
+          last_triggered_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          campaign_name?: string
+          id?: string
+          last_triggered_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      alert_rules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          rule_type: string
+          secondary_threshold: number | null
+          threshold: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          rule_type: string
+          secondary_threshold?: number | null
+          threshold?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          rule_type?: string
+          secondary_threshold?: number | null
+          threshold?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      audit_clients: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          looker_approved: boolean
+          looker_report_url: string | null
+          name: string
+          report_recipients: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          looker_approved?: boolean
+          looker_report_url?: string | null
+          name: string
+          report_recipients?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          looker_approved?: boolean
+          looker_report_url?: string | null
+          name?: string
+          report_recipients?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      audit_records: {
+        Row: {
+          account_id: string | null
+          campaign_name: string
+          client_id: string | null
+          created_at: string
+          fecha_fin: string
+          fecha_inicio: string
+          id: string
+          platform: string | null
+          presupuesto_total: number
+          tipo_calendario: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          campaign_name: string
+          client_id?: string | null
+          created_at?: string
+          fecha_fin: string
+          fecha_inicio: string
+          id?: string
+          platform?: string | null
+          presupuesto_total?: number
+          tipo_calendario?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          campaign_name?: string
+          client_id?: string | null
+          created_at?: string
+          fecha_fin?: string
+          fecha_inicio?: string
+          id?: string
+          platform?: string | null
+          presupuesto_total?: number
+          tipo_calendario?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_briefs: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          benchmark: string | null
+          client_id: string | null
+          created_at: string
+          descripcion_proyecto: string | null
+          diferenciador: string | null
+          elementos_marca: string | null
+          estilo_tono: string | null
+          frases_marca: string | null
+          fundamentos_marca: string | null
+          id: string
+          insights: string | null
+          marca: string | null
+          mercado_objetivo: string | null
+          necesidad_principal: string | null
+          palabras_marca: string | null
+          personalidad_marca: string | null
+          presupuesto_campana: string | null
+          promesa_marca: string | null
+          publico_objetivo: string | null
+          reasons_why: string | null
+          sitio_web: string | null
+          updated_at: string
+          user_id: string
+          valores_marca: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          account_name?: string | null
+          benchmark?: string | null
+          client_id?: string | null
+          created_at?: string
+          descripcion_proyecto?: string | null
+          diferenciador?: string | null
+          elementos_marca?: string | null
+          estilo_tono?: string | null
+          frases_marca?: string | null
+          fundamentos_marca?: string | null
+          id?: string
+          insights?: string | null
+          marca?: string | null
+          mercado_objetivo?: string | null
+          necesidad_principal?: string | null
+          palabras_marca?: string | null
+          personalidad_marca?: string | null
+          presupuesto_campana?: string | null
+          promesa_marca?: string | null
+          publico_objetivo?: string | null
+          reasons_why?: string | null
+          sitio_web?: string | null
+          updated_at?: string
+          user_id: string
+          valores_marca?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          account_name?: string | null
+          benchmark?: string | null
+          client_id?: string | null
+          created_at?: string
+          descripcion_proyecto?: string | null
+          diferenciador?: string | null
+          elementos_marca?: string | null
+          estilo_tono?: string | null
+          frases_marca?: string | null
+          fundamentos_marca?: string | null
+          id?: string
+          insights?: string | null
+          marca?: string | null
+          mercado_objetivo?: string | null
+          necesidad_principal?: string | null
+          palabras_marca?: string | null
+          personalidad_marca?: string | null
+          presupuesto_campana?: string | null
+          promesa_marca?: string | null
+          publico_objetivo?: string | null
+          reasons_why?: string | null
+          sitio_web?: string | null
+          updated_at?: string
+          user_id?: string
+          valores_marca?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cluster_runs: {
+        Row: {
+          client_id: string
+          cluster_key: string
+          created_at: string
+          id: string
+          model: string | null
+          output_html: string | null
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          cluster_key?: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          output_html?: string | null
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          cluster_key?: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          output_html?: string | null
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cluster_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_datos: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          ad_id: string | null
+          ad_name: string | null
+          add_to_cart: number | null
+          adset_budget_remaining: number | null
+          adset_daily_budget: number | null
+          adset_end_date: string | null
+          adset_id: string | null
+          adset_lifetime_budget: number | null
+          adset_name: string | null
+          adset_start_date: string | null
+          budget_remaining: number | null
+          campaign_end_date: string | null
+          campaign_id: string | null
+          campaign_lifetime_budget: number | null
+          campaign_name: string | null
+          campaign_start_date: string | null
+          clicks: number | null
+          conversion_rate_ranking: string | null
+          conversions: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string
+          ctr_all: number | null
+          daily_budget: number | null
+          engagement_rate_ranking: string | null
+          fecha: string | null
+          frequency: number | null
+          id: number
+          impressions: number | null
+          initiate_checkout: number | null
+          interactions: number | null
+          landing_page_views: number | null
+          lead_value: number | null
+          link_clicks: number | null
+          objective: string | null
+          optimization_goal: string | null
+          plataforma: string
+          platform_specific: Json
+          publisher_platform: string | null
+          purchase_roas: number | null
+          purchase_value: number | null
+          purchases: number | null
+          quality_ranking: string | null
+          reach: number | null
+          thruplay_actions: number | null
+          total_cost: number | null
+          unique_clicks: number | null
+          unique_ctr: number | null
+          website_purchase_roas: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          account_name?: string | null
+          ad_id?: string | null
+          ad_name?: string | null
+          add_to_cart?: number | null
+          adset_budget_remaining?: number | null
+          adset_daily_budget?: number | null
+          adset_end_date?: string | null
+          adset_id?: string | null
+          adset_lifetime_budget?: number | null
+          adset_name?: string | null
+          adset_start_date?: string | null
+          budget_remaining?: number | null
+          campaign_end_date?: string | null
+          campaign_id?: string | null
+          campaign_lifetime_budget?: number | null
+          campaign_name?: string | null
+          campaign_start_date?: string | null
+          clicks?: number | null
+          conversion_rate_ranking?: string | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr_all?: number | null
+          daily_budget?: number | null
+          engagement_rate_ranking?: string | null
+          fecha?: string | null
+          frequency?: number | null
+          id?: number
+          impressions?: number | null
+          initiate_checkout?: number | null
+          interactions?: number | null
+          landing_page_views?: number | null
+          lead_value?: number | null
+          link_clicks?: number | null
+          objective?: string | null
+          optimization_goal?: string | null
+          plataforma?: string
+          platform_specific?: Json
+          publisher_platform?: string | null
+          purchase_roas?: number | null
+          purchase_value?: number | null
+          purchases?: number | null
+          quality_ranking?: string | null
+          reach?: number | null
+          thruplay_actions?: number | null
+          total_cost?: number | null
+          unique_clicks?: number | null
+          unique_ctr?: number | null
+          website_purchase_roas?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          account_name?: string | null
+          ad_id?: string | null
+          ad_name?: string | null
+          add_to_cart?: number | null
+          adset_budget_remaining?: number | null
+          adset_daily_budget?: number | null
+          adset_end_date?: string | null
+          adset_id?: string | null
+          adset_lifetime_budget?: number | null
+          adset_name?: string | null
+          adset_start_date?: string | null
+          budget_remaining?: number | null
+          campaign_end_date?: string | null
+          campaign_id?: string | null
+          campaign_lifetime_budget?: number | null
+          campaign_name?: string | null
+          campaign_start_date?: string | null
+          clicks?: number | null
+          conversion_rate_ranking?: string | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr_all?: number | null
+          daily_budget?: number | null
+          engagement_rate_ranking?: string | null
+          fecha?: string | null
+          frequency?: number | null
+          id?: number
+          impressions?: number | null
+          initiate_checkout?: number | null
+          interactions?: number | null
+          landing_page_views?: number | null
+          lead_value?: number | null
+          link_clicks?: number | null
+          objective?: string | null
+          optimization_goal?: string | null
+          plataforma?: string
+          platform_specific?: Json
+          publisher_platform?: string | null
+          purchase_roas?: number | null
+          purchase_value?: number | null
+          purchases?: number | null
+          quality_ranking?: string | null
+          reach?: number | null
+          thruplay_actions?: number | null
+          total_cost?: number | null
+          unique_clicks?: number | null
+          unique_ctr?: number | null
+          website_purchase_roas?: number | null
+        }
+        Relationships: []
+      }
       presenter_notes: {
         Row: {
           content: string
@@ -38,15 +515,86 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      weekly_reports: {
+        Row: {
+          client_id: string
+          created_at: string
+          html: string | null
+          id: string
+          sent_at: string | null
+          sent_to: string[]
+          user_id: string
+          week_end: string
+          week_start: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          html?: string | null
+          id?: string
+          sent_at?: string | null
+          sent_to?: string[]
+          user_id: string
+          week_end: string
+          week_start: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          html?: string | null
+          id?: string
+          sent_at?: string | null
+          sent_to?: string[]
+          user_id?: string
+          week_end?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -173,6 +721,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
