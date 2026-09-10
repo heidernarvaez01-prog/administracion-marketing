@@ -10,6 +10,10 @@
 	var $migrationPending = $("#migrationPending");
 	var $authRequired = $("#authRequired");
 
+	var $summary = $("#clientsSummary");
+	var allClients = [];
+	var statsByClient = {};
+
 	var $clientModal = $("#clientModal");
 	var clientModalEl = document.getElementById("clientModal");
 	var deleteModalEl = document.getElementById("deleteClientModal");
