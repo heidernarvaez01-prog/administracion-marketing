@@ -10,6 +10,10 @@
 	var $migrationPending = $("#migrationPending");
 	var $authRequired = $("#authRequired");
 
+	var $summary = $("#clientsSummary");
+	var allClients = [];
+	var statsByClient = {};
+
 	var $clientModal = $("#clientModal");
 	var clientModalEl = document.getElementById("clientModal");
 	var deleteModalEl = document.getElementById("deleteClientModal");
@@ -39,6 +43,31 @@
 
 	var ACCENTS = ["bg-primary", "bg-info", "bg-success", "bg-secondary", "bg-warning", "bg-danger"];
 
+	function money(n) {
+		var v = Number(n || 0);
+		return "$" + v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
+	}
+
+	function fmtDate(iso) {
+		if (!iso) return "—";
+		var d = new Date(iso);
+		if (isNaN(d.getTime())) return "—";
+		return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+	}
+
+	function renderSummary(clients) {
+		var campaigns = 0, budget = 0;
+		clients.forEach(function (c) {
+			var s = statsByClient[c.id] || { campaigns: 0, budget: 0 };
+			campaigns += s.campaigns;
+			budget += s.budget;
+		});
+		$("#sumClients").text(clients.length);
+		$("#sumCampaigns").text(campaigns);
+		$("#sumBudget").text(money(budget));
+		$summary.removeClass("d-none");
+	}
+
 	function renderClients(clients) {
 		if (!clients.length) {
 			showOnly($empty);
@@ -46,13 +75,14 @@
 		}
 		var html = clients.map(function (c, idx) {
 			var accent = ACCENTS[idx % ACCENTS.length];
+			var stats = statsByClient[c.id] || { campaigns: 0, budget: 0, last: null };
 			var desc = c.description
 				? '<p class="text-muted fs-13 mb-0 text-ov">' + escapeHtml(c.description) + "</p>"
 				: '<p class="text-muted fs-13 mb-0 fst-italic">Sin descripción</p>';
 			return (
 				'<div class="col-xl-4 col-lg-6 col-md-6">' +
-				'<div class="card">' +
-				'<div class="card-body">' +
+				'<div class="card h-100">' +
+				'<div class="card-body d-flex flex-column">' +
 				'<div class="d-flex align-items-start">' +
 				'<span class="' + accent + ' text-white rounded d-flex align-items-center justify-content-center me-3 fw-bold" style="width:44px;height:44px;flex:none;">' +
 				escapeHtml(initials(c.name)) +
@@ -69,6 +99,17 @@
 				"</div>" +
 				"</div>" +
 				"</div>" +
+				'<div class="row text-center mt-4 mb-1">' +
+				'<div class="col-6 border-end">' +
+				'<h4 class="mb-0 font-w600">' + stats.campaigns + "</h4>" +
+				'<span class="fs-12 text-muted">Campañas</span>' +
+				"</div>" +
+				'<div class="col-6">' +
+				'<h4 class="mb-0 font-w600">' + money(stats.budget) + "</h4>" +
+				'<span class="fs-12 text-muted">Presupuesto</span>' +
+				"</div>" +
+				"</div>" +
+				'<p class="fs-12 text-muted text-center mt-2 mb-0">Última auditoría: ' + fmtDate(stats.last) + "</p>" +
 				'<a href="auditoria.html?client_id=' + c.id + '" class="btn btn-outline-primary btn-sm w-100 mt-3">Abrir auditoría <i class="fa fa-arrow-right ms-1"></i></a>' +
 				"</div>" +
 				"</div>" +
@@ -77,6 +118,37 @@
 		}).join("");
 		$grid.html(html);
 		showOnly($grid);
+	}
+
+	function applyFilter() {
+		var q = String($("#clientSearch").val() || "").trim().toLowerCase();
+		var filtered = !q ? allClients : allClients.filter(function (c) {
+			return (String(c.name || "") + " " + String(c.description || "")).toLowerCase().indexOf(q) !== -1;
+		});
+		if (!filtered.length && allClients.length) {
+			$grid.html('<div class="col-12"><div class="card"><div class="card-body text-center py-5 text-muted">Ningún cliente coincide con la búsqueda.</div></div></div>');
+			showOnly($grid);
+			return;
+		}
+		renderClients(filtered);
+	}
+
+	function loadStats(clients) {
+		statsByClient = {};
+		if (!clients.length) return Promise.resolve();
+		return supabase
+			.from("audit_records")
+			.select("client_id,presupuesto_total,updated_at")
+			.then(function (res) {
+				(res.data || []).forEach(function (r) {
+					if (!r.client_id) return;
+					var s = statsByClient[r.client_id] || { campaigns: 0, budget: 0, last: null };
+					s.campaigns += 1;
+					s.budget += Number(r.presupuesto_total || 0);
+					if (!s.last || (r.updated_at && r.updated_at > s.last)) s.last = r.updated_at;
+					statsByClient[r.client_id] = s;
+				});
+			});
 	}
 
 	function loadClients() {
@@ -89,12 +161,17 @@
 				if (res.error) {
 					// 42P01/PGRST205 = la tabla no existe todavía (migración pendiente)
 					$migrationPending.removeClass("d-none");
+					$summary.addClass("d-none");
 					$loading.addClass("d-none");
 					$empty.addClass("d-none");
 					$grid.addClass("d-none");
 					return;
 				}
-				renderClients(res.data || []);
+				allClients = res.data || [];
+				return Promise.resolve(loadStats(allClients)).then(function () {
+					renderSummary(allClients);
+					applyFilter();
+				});
 			});
 	}
 
