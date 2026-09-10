@@ -101,6 +101,39 @@ export type Database = {
         }
         Relationships: []
       }
+      alert_settings: {
+        Row: {
+          created_at: string
+          email_recipients: string[]
+          enabled: boolean
+          id: string
+          notify_frequency: string
+          only_critical: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_recipients?: string[]
+          enabled?: boolean
+          id?: string
+          notify_frequency?: string
+          only_critical?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_recipients?: string[]
+          enabled?: boolean
+          id?: string
+          notify_frequency?: string
+          only_critical?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_clients: {
         Row: {
           created_at: string
@@ -278,6 +311,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "brand_briefs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_ai_insights: {
+        Row: {
+          campaign_name: string
+          client_id: string | null
+          created_at: string
+          finding: string
+          id: string
+          metrics_snapshot: Json
+          recommendation: string
+          severity: string
+          user_id: string
+        }
+        Insert: {
+          campaign_name: string
+          client_id?: string | null
+          created_at?: string
+          finding: string
+          id?: string
+          metrics_snapshot?: Json
+          recommendation: string
+          severity: string
+          user_id: string
+        }
+        Update: {
+          campaign_name?: string
+          client_id?: string | null
+          created_at?: string
+          finding?: string
+          id?: string
+          metrics_snapshot?: Json
+          recommendation?: string
+          severity?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_ai_insights_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "audit_clients"
@@ -488,6 +565,69 @@ export type Database = {
           unique_clicks?: number | null
           unique_ctr?: number | null
           website_purchase_roas?: number | null
+        }
+        Relationships: []
+      }
+      notification_channels: {
+        Row: {
+          channel_type: string
+          config: Json
+          created_at: string
+          enabled: boolean
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_type: string
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_type?: string
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          alert_type: string
+          campaign_name: string
+          created_at: string
+          id: string
+          message: string
+          read_at: string | null
+          severity: string
+          user_id: string
+        }
+        Insert: {
+          alert_type: string
+          campaign_name: string
+          created_at?: string
+          id?: string
+          message: string
+          read_at?: string | null
+          severity: string
+          user_id: string
+        }
+        Update: {
+          alert_type?: string
+          campaign_name?: string
+          created_at?: string
+          id?: string
+          message?: string
+          read_at?: string | null
+          severity?: string
+          user_id?: string
         }
         Relationships: []
       }
