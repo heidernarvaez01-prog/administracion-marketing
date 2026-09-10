@@ -1009,6 +1009,50 @@
 					</div>
 				</div>
 
+				<!-- Resumen + buscador -->
+				<div id="clientsSummary" class="row d-none">
+					<div class="col-xl-3 col-lg-4 col-sm-6">
+						<div class="card">
+							<div class="card-body d-flex align-items-center">
+								<span class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-users"></i></span>
+								<div>
+									<h3 class="mb-0 font-w600" id="sumClients">0</h3>
+									<span class="fs-13 text-muted">Clientes</span>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="col-xl-3 col-lg-4 col-sm-6">
+						<div class="card">
+							<div class="card-body d-flex align-items-center">
+								<span class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-bullhorn"></i></span>
+								<div>
+									<h3 class="mb-0 font-w600" id="sumCampaigns">0</h3>
+									<span class="fs-13 text-muted">Campañas auditadas</span>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="col-xl-3 col-lg-4 col-sm-6">
+						<div class="card">
+							<div class="card-body d-flex align-items-center">
+								<span class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-money"></i></span>
+								<div>
+									<h3 class="mb-0 font-w600" id="sumBudget">$0</h3>
+									<span class="fs-13 text-muted">Presupuesto total</span>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="col-xl-3 col-lg-12 col-sm-6">
+						<div class="card">
+							<div class="card-body">
+								<input type="text" class="form-control" id="clientSearch" placeholder="Buscar cliente...">
+							</div>
+						</div>
+					</div>
+				</div>
+
 				<!-- Estado: cargando -->
 				<div id="clientsLoading" class="text-center py-5">
 					<div class="spinner-border text-primary" role="status"></div>
