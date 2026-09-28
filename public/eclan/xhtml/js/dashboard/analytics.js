@@ -331,7 +331,7 @@
 				setLoading(false);
 				renderKpis(data);
 				lineChart("activity", data.clickSummary.labels, data.clickSummary.data, "rgb(82, 177, 65)", "Clics", false);
-				lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(255, 142, 38)", "Gasto", true);
+				lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(236, 72, 153)", "Gasto", true);
 				renderGoalStatistic(data.objectiveBreakdown, data.ctrGauge);
 				renderPlatformBreakdown(data.plataformas);
 				renderEngagementChart(data.engagementByPlatform);
