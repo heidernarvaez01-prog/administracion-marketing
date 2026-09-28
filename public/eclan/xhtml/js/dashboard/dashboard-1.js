@@ -139,8 +139,8 @@
 							{
 								label: 'Dataset 2',
 								data: activityData[0].second,
-								backgroundColor: 'rgba(255, 142, 38, 1)',
-								borderColor: "rgba(255, 142, 38, 1)",
+								backgroundColor: 'rgba(236, 72, 153, 1)',
+								borderColor: "rgba(236, 72, 153, 1)",
 								fill: true
 							}
 						]
