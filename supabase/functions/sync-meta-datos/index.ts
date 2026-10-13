@@ -1,4 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  BACKFILL_WINDOW_DAYS,
+  classifyAccounts,
+  latestActivityDate,
+  maxDate,
+  sanitizeError,
+  summarizeProbe,
+  toIsoDate,
+  windsorRangeParams,
+  type AdAccount,
+  type ProbeSummary,
+} from "./sync-plan.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,14 +57,21 @@ const WINDSOR_FIELDS = [
   // table) rather than adding it to this one. See CLAUDE.md.
   "actions_landing_page_view",
 ].join(",");
-const WINDSOR_ACCOUNTS = "204109401";
 
-function buildWindsorUrl(apiKey: string): string {
+// Sondeo de cuentas dormidas: solo lo mínimo para saber si volvieron a tener actividad.
+const PROBE_FIELDS = ["account_id", "date", "spend", "impressions"].join(",");
+
+function buildWindsorUrl(
+  apiKey: string,
+  accountIds: string[],
+  fields: string,
+  range: Record<string, string>,
+): string {
   const params = new URLSearchParams({
     api_key: apiKey,
-    date_preset: "last_30d",
-    fields: WINDSOR_FIELDS,
-    select_accounts: WINDSOR_ACCOUNTS,
+    fields,
+    select_accounts: accountIds.join(","),
+    ...range,
   });
   return `https://connectors.windsor.ai/facebook?${params.toString()}`;
 }
@@ -93,110 +112,344 @@ function toStr(v: unknown): string | null {
   return String(v);
 }
 
+// deno-lint-ignore no-explicit-any
+type Supa = any;
+
+interface Ctx {
+  supabase: Supa;
+  apiKey: string;
+  runId: string;
+  today: string; // YYYY-MM-DD en UTC
+}
+
+async function fetchWindsor(
+  apiKey: string,
+  accountIds: string[],
+  fields: string,
+  range: Record<string, string>,
+  // deno-lint-ignore no-explicit-any
+): Promise<any[]> {
+  const res = await fetch(buildWindsorUrl(apiKey, accountIds, fields, range));
+  if (!res.ok) throw new Error(`Windsor fetch failed: ${res.status}`);
+  const json = await res.json();
+  return json?.data ?? [];
+}
+
+// deno-lint-ignore no-explicit-any
+function mapRow(r: any) {
+  const spend = toNum(r["spend"]);
+  const clicks = toInt(r["clicks"]);
+  const cpc = spend !== null && clicks && clicks > 0 ? spend / clicks : null;
+  return {
+    account_id: toStr(r["account_id"]),
+    account_name: toStr(r["account_name"]),
+    campaign_name: toStr(r["campaign"]),
+    campaign_id: toStr(r["campaign_id"]),
+    objective: toStr(r["campaign_objective"]),
+    adset_name: toStr(r["adset_name"]),
+    adset_id: toStr(r["adset_id"]),
+    ad_id: toStr(r["ad_id"]),
+    ad_name: toStr(r["ad_name"]),
+    optimization_goal: toStr(r["adsset_optimization_goal"]),
+    plataforma: "META",
+    fecha: toDate(r["date"]),
+    campaign_start_date: toUnixDate(r["campaign_start_time"]),
+    campaign_end_date: toUnixDate(r["campaign_stop_time"]),
+    adset_start_date: toUnixDate(r["adset_start_time"]),
+    adset_end_date: toUnixDate(r["adset_end_time"]),
+    campaign_lifetime_budget: toNum(r["campaign_lifetime_budget"]),
+    daily_budget: toNum(r["campaign_daily_budget"]),
+    budget_remaining: toNum(r["campaign_budget_remaining"]),
+    adset_lifetime_budget: toNum(r["adset_lifetime_budget"]),
+    adset_daily_budget: toNum(r["adset_daily_budget"]),
+    adset_budget_remaining: toNum(r["adset_budget_remaining"]),
+    total_cost: spend,
+    cpc,
+    cpm: toNum(r["cpm"]),
+    frequency: toNum(r["frequency"]),
+    ctr_all: toNum(r["ctr"]),
+    clicks,
+    reach: toInt(r["reach"]),
+    impressions: toInt(r["impressions"]),
+    thruplay_actions: toInt(r["video_thruplay_watched_actions_video_view"]),
+    link_clicks: toInt(r["link_clicks"]),
+    interactions: toInt(r["actions_post_engagement"]),
+    conversions: toNum(r["conversions"]),
+    purchases: toNum(r["actions_omni_purchase"]),
+    add_to_cart: toNum(r["actions_omni_add_to_cart"]),
+    initiate_checkout: toNum(r["actions_omni_initiated_checkout"]),
+    purchase_value: toNum(r["action_values_omni_purchase"]),
+    lead_value: toNum(r["action_values_lead"]),
+    purchase_roas: toNum(r["purchase_roas_omni_purchase"]),
+    website_purchase_roas: toNum(r["website_purchase_roas_offsite_conversion_fb_pixel_purchase"]),
+    quality_ranking: toStr(r["quality_ranking"]),
+    engagement_rate_ranking: toStr(r["engagement_rate_ranking"]),
+    conversion_rate_ranking: toStr(r["conversion_rate_ranking"]),
+    unique_clicks: toInt(r["unique_clicks"]),
+    unique_ctr: toNum(r["unique_ctr"]),
+    // publisher_platform intentionally not requested/mapped — see WINDSOR_FIELDS comment above.
+    landing_page_views: toInt(r["actions_landing_page_view"]),
+  };
+}
+
+// Upsert por lotes sobre la llave natural (plataforma, account_id,
+// campaign_id, adset_id, ad_id, fecha) — ver migración
+// 20260817160100_meta_datos_multiplatform_upsert.sql. Reemplaza el
+// patrón anterior de "borrar todo e insertar todo", que además de ser
+// el P0 de CLAUDE.md era una bomba de tiempo multiplataforma: cada
+// corrida de este sync borraba también las filas de cualquier otra
+// plataforma (ej. un futuro sync-google-datos).
+const NATURAL_KEY = "plataforma,account_id,campaign_id,adset_id,ad_id,fecha";
+const BATCH = 500;
+
+async function upsertRows(supabase: Supa, mapped: ReturnType<typeof mapRow>[]): Promise<number> {
+  let upserted = 0;
+  for (let i = 0; i < mapped.length; i += BATCH) {
+    const chunk = mapped.slice(i, i + BATCH);
+    const { error } = await supabase
+      .from("meta_datos")
+      .upsert(chunk, { onConflict: NATURAL_KEY });
+    if (error) throw error;
+    upserted += chunk.length;
+  }
+  return upserted;
+}
+
+function errMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
+  return String(e ?? "unknown");
+}
+
+interface RunLog {
+  account_id: string;
+  mode: "completo" | "sondeo";
+  window_days: number | null;
+  rows: number;
+  status: "ok" | "error";
+  error?: string | null;
+  started_at: Date;
+  finished_at: Date;
+}
+
+// Registrar la corrida es "best effort": si falla el log, el sync de datos sigue.
+async function logRun(ctx: Ctx, e: RunLog): Promise<void> {
+  const ms = e.finished_at.getTime() - e.started_at.getTime();
+  console.log(JSON.stringify({
+    run_id: ctx.runId, account_id: e.account_id, mode: e.mode,
+    window_days: e.window_days, rows: e.rows, status: e.status, ms,
+  }));
+  try {
+    const { error } = await ctx.supabase.from("sync_runs").insert({
+      run_id: ctx.runId,
+      account_id: e.account_id,
+      mode: e.mode,
+      window_days: e.window_days,
+      rows: e.rows,
+      status: e.status,
+      error: e.error ?? null,
+      started_at: e.started_at.toISOString(),
+      finished_at: e.finished_at.toISOString(),
+    });
+    if (error) console.error("sync_runs: no se pudo registrar:", sanitizeError(error.message, [ctx.apiKey]));
+  } catch (err) {
+    console.error("sync_runs: no se pudo registrar:", sanitizeError(errMsg(err), [ctx.apiKey]));
+  }
+}
+
+// Sync completo (nivel anuncio) de UNA cuenta. Devuelve true si salió bien.
+async function runFullSync(ctx: Ctx, account: AdAccount, windowDays: number): Promise<boolean> {
+  const started = new Date();
+  let rowsWritten = 0;
+  try {
+    const rows = await fetchWindsor(
+      ctx.apiKey,
+      [account.account_id],
+      WINDSOR_FIELDS,
+      windsorRangeParams(windowDays, ctx.today),
+    );
+    const mapped = rows.map(mapRow);
+    rowsWritten = await upsertRows(ctx.supabase, mapped);
+
+    // last_data_date = fecha más reciente con spend>0 o impresiones>0 (nunca retrocede).
+    const latest = latestActivityDate(
+      mapped.map((m) => ({ date: m.fecha, spend: m.total_cost, impressions: m.impressions })),
+    );
+    const newLast = maxDate(account.last_data_date, latest);
+    if (newLast && newLast !== account.last_data_date) {
+      const { error } = await ctx.supabase
+        .from("ad_accounts")
+        .update({ last_data_date: newLast })
+        .eq("account_id", account.account_id);
+      if (error) throw error;
+      account.last_data_date = newLast;
+    }
+
+    await logRun(ctx, {
+      account_id: account.account_id, mode: "completo", window_days: windowDays,
+      rows: rowsWritten, status: "ok", started_at: started, finished_at: new Date(),
+    });
+    return true;
+  } catch (e) {
+    await logRun(ctx, {
+      account_id: account.account_id, mode: "completo", window_days: windowDays,
+      rows: rowsWritten, status: "error", error: sanitizeError(errMsg(e), [ctx.apiKey]),
+      started_at: started, finished_at: new Date(),
+    });
+    return false;
+  }
+}
+
+// Sondeo de TODAS las cuentas dormidas en UNA sola llamada a Windsor (últimos 7 días,
+// solo account_id/date/spend/impressions). Devuelve las que mostraron actividad.
+async function runProbe(
+  ctx: Ctx,
+  dormant: AdAccount[],
+): Promise<{ errors: number; awake: AdAccount[] }> {
+  const started = new Date();
+  const ids = dormant.map((a) => a.account_id);
+  const PROBE_DAYS = 7;
+
+  let summary: Map<string, ProbeSummary>;
+  try {
+    const rows = await fetchWindsor(ctx.apiKey, ids, PROBE_FIELDS, { date_preset: "last_7d" });
+    summary = summarizeProbe(rows, ids);
+  } catch (e) {
+    // El sondeo no ocurrió: no se toca last_probe_at; se registra el error por cada cuenta.
+    const finished = new Date();
+    const msg = sanitizeError(errMsg(e), [ctx.apiKey]);
+    for (const a of dormant) {
+      await logRun(ctx, {
+        account_id: a.account_id, mode: "sondeo", window_days: PROBE_DAYS, rows: 0,
+        status: "error", error: msg, started_at: started, finished_at: finished,
+      });
+    }
+    return { errors: dormant.length, awake: [] };
+  }
+
+  const probedAt = new Date();
+  const awake: AdAccount[] = [];
+  let errors = 0;
+  for (const a of dormant) {
+    const s = summary.get(a.account_id)!;
+    try {
+      const newLast = maxDate(a.last_data_date, s.latestActivityDate);
+      const patch: Record<string, string | null> = { last_probe_at: probedAt.toISOString() };
+      if (s.latestActivityDate && newLast) patch.last_data_date = newLast;
+      const { error } = await ctx.supabase
+        .from("ad_accounts")
+        .update(patch)
+        .eq("account_id", a.account_id);
+      if (error) throw error;
+
+      await logRun(ctx, {
+        account_id: a.account_id, mode: "sondeo", window_days: PROBE_DAYS, rows: s.rows,
+        status: "ok", started_at: started, finished_at: probedAt,
+      });
+      if (s.latestActivityDate) awake.push({ ...a, last_data_date: newLast });
+    } catch (e) {
+      errors++;
+      await logRun(ctx, {
+        account_id: a.account_id, mode: "sondeo", window_days: PROBE_DAYS, rows: s.rows,
+        status: "error", error: sanitizeError(errMsg(e), [ctx.apiKey]),
+        started_at: started, finished_at: new Date(),
+      });
+    }
+  }
+  return { errors, awake };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const startedMs = Date.now();
+  const runId = crypto.randomUUID();
+  const windsorApiKey = Deno.env.get("WINDSOR_API_KEY") ?? "";
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   try {
-    const windsorApiKey = Deno.env.get("WINDSOR_API_KEY");
     if (!windsorApiKey) {
       throw new Error("WINDSOR_API_KEY is not configured (set it with `supabase secrets set`)");
     }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+    const ctx: Ctx = { supabase, apiKey: windsorApiKey, runId, today: toIsoDate(new Date()) };
 
-    const res = await fetch(buildWindsorUrl(windsorApiKey));
-    if (!res.ok) throw new Error(`Windsor fetch failed: ${res.status}`);
-    const json = await res.json();
-    const rows: any[] = json?.data ?? [];
+    // 1) Cuentas desde ad_accounts (ya no hay una cuenta hardcodeada).
+    const { data: accountRows, error: accErr } = await supabase
+      .from("ad_accounts")
+      .select("account_id,account_name,platform,active,sync_mode,last_data_date,last_probe_at")
+      .eq("platform", "facebook");
+    if (accErr) throw accErr;
+    const accounts = (accountRows ?? []) as AdAccount[];
 
-    const mapped = rows.map((r) => {
-      const spend = toNum(r["spend"]);
-      const clicks = toInt(r["clicks"]);
-      const cpc = spend !== null && clicks && clicks > 0 ? spend / clicks : null;
-      return {
-        account_id: toStr(r["account_id"]),
-        account_name: toStr(r["account_name"]),
-        campaign_name: toStr(r["campaign"]),
-        campaign_id: toStr(r["campaign_id"]),
-        objective: toStr(r["campaign_objective"]),
-        adset_name: toStr(r["adset_name"]),
-        adset_id: toStr(r["adset_id"]),
-        ad_id: toStr(r["ad_id"]),
-        ad_name: toStr(r["ad_name"]),
-        optimization_goal: toStr(r["adsset_optimization_goal"]),
-        plataforma: "META",
-        fecha: toDate(r["date"]),
-        campaign_start_date: toUnixDate(r["campaign_start_time"]),
-        campaign_end_date: toUnixDate(r["campaign_stop_time"]),
-        adset_start_date: toUnixDate(r["adset_start_time"]),
-        adset_end_date: toUnixDate(r["adset_end_time"]),
-        campaign_lifetime_budget: toNum(r["campaign_lifetime_budget"]),
-        daily_budget: toNum(r["campaign_daily_budget"]),
-        budget_remaining: toNum(r["campaign_budget_remaining"]),
-        adset_lifetime_budget: toNum(r["adset_lifetime_budget"]),
-        adset_daily_budget: toNum(r["adset_daily_budget"]),
-        adset_budget_remaining: toNum(r["adset_budget_remaining"]),
-        total_cost: spend,
-        cpc,
-        cpm: toNum(r["cpm"]),
-        frequency: toNum(r["frequency"]),
-        ctr_all: toNum(r["ctr"]),
-        clicks,
-        reach: toInt(r["reach"]),
-        impressions: toInt(r["impressions"]),
-        thruplay_actions: toInt(r["video_thruplay_watched_actions_video_view"]),
-        link_clicks: toInt(r["link_clicks"]),
-        interactions: toInt(r["actions_post_engagement"]),
-        conversions: toNum(r["conversions"]),
-        purchases: toNum(r["actions_omni_purchase"]),
-        add_to_cart: toNum(r["actions_omni_add_to_cart"]),
-        initiate_checkout: toNum(r["actions_omni_initiated_checkout"]),
-        purchase_value: toNum(r["action_values_omni_purchase"]),
-        lead_value: toNum(r["action_values_lead"]),
-        purchase_roas: toNum(r["purchase_roas_omni_purchase"]),
-        website_purchase_roas: toNum(r["website_purchase_roas_offsite_conversion_fb_pixel_purchase"]),
-        quality_ranking: toStr(r["quality_ranking"]),
-        engagement_rate_ranking: toStr(r["engagement_rate_ranking"]),
-        conversion_rate_ranking: toStr(r["conversion_rate_ranking"]),
-        unique_clicks: toInt(r["unique_clicks"]),
-        unique_ctr: toNum(r["unique_ctr"]),
-        // publisher_platform intentionally not requested/mapped — see WINDSOR_FIELDS comment above.
-        landing_page_views: toInt(r["actions_landing_page_view"]),
-      };
-    });
+    // 2) ¿Qué cuentas ya tuvieron un sync completo exitoso? Una consulta por cuenta
+    //    (evita el límite de 1000 filas de PostgREST cuando sync_runs crezca).
+    const eligible = accounts.filter((a) => a.active && a.sync_mode !== "never");
+    const firstSyncDone = new Set<string>();
+    await Promise.all(eligible.map(async (a) => {
+      const { data, error } = await supabase
+        .from("sync_runs")
+        .select("id")
+        .eq("account_id", a.account_id)
+        .eq("mode", "completo")
+        .eq("status", "ok")
+        .limit(1);
+      if (error) throw error; // sin sync_runs no hay forma de saber si es la primera vez
+      if (data && data.length > 0) firstSyncDone.add(a.account_id);
+    }));
 
-    // Upsert por lotes sobre la llave natural (plataforma, account_id,
-    // campaign_id, adset_id, ad_id, fecha) — ver migración
-    // 20260817160100_meta_datos_multiplatform_upsert.sql. Reemplaza el
-    // patrón anterior de "borrar todo e insertar todo", que además de ser
-    // el P0 de CLAUDE.md era una bomba de tiempo multiplataforma: cada
-    // corrida de este sync borraba también las filas de cualquier otra
-    // plataforma (ej. un futuro sync-google-datos).
-    const NATURAL_KEY = "plataforma,account_id,campaign_id,adset_id,ad_id,fecha";
-    const BATCH = 500;
-    let upserted = 0;
-    for (let i = 0; i < mapped.length; i += BATCH) {
-      const chunk = mapped.slice(i, i + BATCH);
-      const { error } = await supabase
-        .from("meta_datos")
-        .upsert(chunk, { onConflict: NATURAL_KEY });
-      if (error) throw error;
-      upserted += chunk.length;
+    // 3) Aplicar la regla por cuenta.
+    const plan = classifyAccounts(accounts, ctx.today, firstSyncDone);
+    let fullSynced = 0;
+    let woken = 0;
+    let errors = 0;
+
+    // 3a) Sync completo de las cuentas con datos recientes (una llamada por cuenta:
+    //     un fallo no tumba a las demás y el conteo de filas queda por cuenta).
+    for (const item of plan.full) {
+      if (await runFullSync(ctx, { ...item.account }, item.windowDays)) fullSynced++;
+      else errors++;
     }
 
-    return new Response(
-      JSON.stringify({ success: true, inserted: upserted, total: mapped.length, source: "windsor" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // 3b) Sondeo único de las dormidas; las que despiertan hacen backfill de 35 días.
+    if (plan.dormant.length > 0) {
+      const probe = await runProbe(ctx, plan.dormant);
+      errors += probe.errors;
+      for (const acc of probe.awake) {
+        woken++;
+        if (await runFullSync(ctx, acc, BACKFILL_WINDOW_DAYS)) fullSynced++;
+        else errors++;
+      }
+    }
+
+    const durationMs = Date.now() - startedMs;
+    console.log(JSON.stringify({
+      run_id: runId, full_synced: fullSynced, probed: plan.dormant.length, woken,
+      skipped: plan.skipped.length, errors, duration_ms: durationMs,
+    }));
+
+    // Respuesta mínima a propósito: solo conteos. La función es pública
+    // (verify_jwt=false); el detalle por cuenta vive en sync_runs (solo admin).
+    return json({
+      success: errors === 0,
+      run_id: runId,
+      full_synced: fullSynced,
+      probed: plan.dormant.length,
+      woken,
+      skipped: plan.skipped.length,
+      errors,
+      duration_ms: durationMs,
+    }, errors === 0 ? 200 : 500);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown";
-    console.error("sync-meta-datos error:", msg);
-    return new Response(JSON.stringify({ success: false, error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("sync-meta-datos error:", sanitizeError(errMsg(e), [windsorApiKey]));
+    return json({ success: false, run_id: runId, error: "sync_failed" }, 500);
   }
 });
