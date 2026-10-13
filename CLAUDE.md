@@ -7,7 +7,9 @@ Empieza con un cliente, pero debe servir para varios, y un cliente puede tener V
 
 ## Proyecto y stack (verificado 2026-10-13)
 - Lovable project id: bfd44a5e-ab54-4911-8fb5-a6a4aa1e4b53 (publicado, audiencia pública). Backend Supabase (Lovable Cloud).
-- React + Vite + Tailwind + shadcn/ui. Plantilla Envato "Eclan v2.0" (HTML plano) = SOLO referencia visual; se portan vistas a React.
+- React + Vite + Tailwind + shadcn/ui. Plantilla Envato "Eclan v2.0" (HTML plano).
+- **La interfaz que ve el cliente es Eclan HTML** (`public/eclan/xhtml/`) — ahí se construye todo lo nuevo.
+  **React (`/app`) es la plataforma de auditoría original** (Ad-Audit-Platform) y se mantiene tal cual, sin cambios por ahora.
 - Nombre del producto: "Apache 360".
 
 ## Lo que YA existe en la base (no duplicar)
@@ -31,8 +33,10 @@ Empieza con un cliente, pero debe servir para varios, y un cliente puede tener V
 - Policies nuevas (aditivas): miembros ven su cliente en `audit_clients` y sus filas de `meta_datos`.
   Las policies existentes (admin / account_assignments) siguen intactas.
 - Datos ya cargados: cliente "Ginecea" en `audit_clients` (dueño: el usuario admin) vinculado a la cuenta 945132301704574 en `client_accounts`.
-  Existe además un cliente "Cliente Demo" del módulo de auditoría. Aún no hay filas en `client_members` (falta crear el login de Ginecea).
+  Existe además un cliente "Cliente Demo" del módulo de auditoría.
   Las cuentas de The Lab no tienen cliente asignado; no crear clientes para ellas sin que Heider lo pida.
+- Usuarios de prueba ya creados (sin asignaciones todavía — ni `client_members` ni `agency_members`):
+  `heider.narvaez01+viewer@gmail.com` y `heider.narvaez01+lab@gmail.com`.
 
 ## Modelo de acceso (3 niveles, aplicado y probado el 2026-10-13)
 super admin (user_roles 'admin', SOLO Heider; ve todo) → agencias (agencies, agency_members con rol manager) → clientes (audit_clients.agency_id) con viewers (client_members).
@@ -81,24 +85,22 @@ Se sincronizan las 7 cuentas (propias y de The Lab), pero sin traer datos de cue
 - Candado de concurrencia (`sync_locks`, TTL 15 min): si ya hay una corrida viva, responde `409 already_running` en vez de arrancar otra.
 - Con secreto+candado ok, responde `202 {accepted:true, run_id}` de inmediato y sincroniza en segundo plano (`EdgeRuntime.waitUntil`), liberando el
   candado al terminar (éxito o error).
-- **Pendiente**: el cron en sí. `supabase/manual/sync_meta_datos_cron.sql` ya existe (programa `sync-meta-datos-daily` a las 08:00 UTC vía `pg_net`,
-  leyendo el secreto desde Vault) pero es "ejecutar a mano en el editor SQL" — requiere primero guardar en Vault un secreto `sync_cron_secret` con el
-  MISMO valor que `SYNC_CRON_SECRET`, y luego correr ese SQL. No se ha confirmado que esté corriendo.
+- **Cron diario ACTIVO** (`sync-meta-datos-daily`, `supabase/manual/sync_meta_datos_cron.sql` corrido, 08:00 UTC vía `pg_net`, secreto leído de Vault).
+  Prueba manual verificada: `202`, ~55 s, 4 cuentas completas ok, 3 dormidas sondeadas, candado liberado al terminar.
 
 ## Pendiente, en este orden
-1. Primer cliente con acceso: Ginecea (decidido, hecho). Moneda: el control para elegir `ad_accounts.currency` por cuenta va en la pantalla del paso 4
-   (crear cliente / adjuntar cuentas), en React — no en `admin.html` de Eclan. Por ahora **no** se agrega columna de tasa de cambio ni UI para ella:
-   se usa solo `currency` (ya existe en `ad_accounts`; Heider la llena por SQL directamente mientras tanto). La tasa de cambio se diseña cuando haga
-   falta un total que mezcle monedas distintas. **Regla de diseño ya decidida para ese momento**: `meta_datos` se queda siempre en la moneda nativa de
-   cada cuenta (nunca se convierte al escribir); la conversión, si hace falta, se hace al leer (vista o consulta), nunca al guardar el dato crudo.
-   No empezado (ver orden: espera a que el paso 3 esté confirmado funcionando).
+1. Primer cliente con acceso: Ginecea (decidido, hecho). Moneda: control para elegir `ad_accounts.currency` por cuenta, **dentro de Eclan**
+   (pantalla "Clientes y Agencias" del paso 4 — no en React). Por ahora **no** se agrega columna de tasa de cambio ni UI para ella.
+   **Ya llena** para 4 cuentas: Ginecea MXN; Kemmerling, Dennys Curacao y Scuba Lodge USD. En `null` (pendiente, se llena desde la UI nueva):
+   ApacheStudio Cuenta Publicitaria, Aruba Wastewater, Navigator Insurances. La tasa de cambio se diseña cuando haga falta un total que mezcle
+   monedas distintas. **Regla de diseño ya decidida para ese momento**: `meta_datos` se queda siempre en la moneda nativa de cada cuenta (nunca se
+   convierte al escribir); la conversión, si hace falta, se hace al leer (vista o consulta), nunca al guardar el dato crudo.
 2. ~~Cambiar `sync-meta-datos`...~~ **Hecho** (ver "Regla de sincronización por cuenta" arriba). `sync_runs` creada y versionada
    (`supabase/migrations/20261013000200_sync_runs.sql`).
-3. Programar el sync diario — código listo (ver "Protección de sync-meta-datos"), **falta correrlo**: guardar el secreto en Vault y ejecutar
-   `supabase/manual/sync_meta_datos_cron.sql`, luego verificar que corre.
-4. Pantalla admin: crear cliente, adjuntar cuentas, invitar miembros (usa `client_accounts` y `client_members`).
-5. Portar vistas de Eclan a React (resumen, campañas, tendencia diaria) leyendo de Supabase, filtradas por cliente.
-6. Chat con datos: Edge Function que consulta solo cuentas permitidas por `can_view_account`, con herramientas, sin SQL libre.
+3. ~~Programar el sync diario...~~ **Hecho** (ver "Protección de `sync-meta-datos`" arriba).
+4. Pantalla "Clientes y Agencias" **dentro de Eclan** (`admin.html`, tab nuevo junto a "Equipo"): crear cliente, adjuntar cuentas, invitar
+   managers/viewers (usa `agencies`, `agency_members`, `client_accounts` y `client_members`). En progreso.
+5. Chat con datos: Edge Function que consulta solo cuentas permitidas por `can_view_account`, con herramientas, sin SQL libre.
 
 ## Windsor.ai (verificado)
 - Conector `facebook`. Para el listado de campos que funciona en producción, ver `WINDSOR_FIELDS` en `sync-meta-datos`.
