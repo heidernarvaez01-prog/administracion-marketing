@@ -34,24 +34,58 @@ Empieza con un cliente, pero debe servir para varios, y un cliente puede tener V
   Existe además un cliente "Cliente Demo" del módulo de auditoría. Aún no hay filas en `client_members` (falta crear el login de Ginecea).
   Las cuentas de The Lab no tienen cliente asignado; no crear clientes para ellas sin que Heider lo pida.
 
-## Regla de sincronización por cuenta (decidida; columnas ya en `ad_accounts`)
+## Regla de sincronización por cuenta (IMPLEMENTADA en `sync-meta-datos`, 2026-10-13)
 Se sincronizan las 7 cuentas (propias y de The Lab), pero sin traer datos de cuentas que no tienen:
 - `active = false` o `sync_mode = 'never'`: se omite por completo (ni siquiera sondeo).
 - `sync_mode = 'always'`: sync completo siempre.
-- `sync_mode = 'auto'` (default): sync completo (nivel anuncio, ventana de 7 días) solo si `last_data_date` es de los últimos 30 días.
+- `sync_mode = 'auto'` (default): sync completo (nivel anuncio) solo si `last_data_date` es de los últimos 30 días.
   Si no (cuenta "dormida", `last_data_date` null o viejo): NO se baja nivel anuncio; solo un SONDEO diario, en una sola llamada a Windsor para todas las
-  cuentas dormidas (últimos 7 días, campos `account_id`, `date`, `spend`, `impressions`).
-  Si el sondeo muestra `spend > 0` o `impressions > 0`: actualizar `last_data_date` con la fecha más reciente con datos, y hacer sync completo de esa cuenta
-  con backfill de 30 días (queda activa sola a partir de ahí).
-- Siempre actualizar `last_probe_at` en cada sondeo y, tras cada sync completo con datos, `last_data_date` = fecha más reciente con spend/impresiones.
-- Estado al 2026-10-13: con datos recientes: Ginecea (945132301704574, desde 2026-10-06), Kemmerling, Dennys Curacao, Scuba Lodge.
-  Dormidas (sin datos en 30 días): ApacheStudio Cuenta Publicitaria, Aruba Wastewater, Navigator Insurances.
-- Registrar cada corrida en `sync_runs` (cuenta, modo: completo/sondeo, filas, estado, error).
+  cuentas dormidas a la vez (últimos 7 días, campos `account_id`, `date`, `spend`, `impressions`).
+  Si el sondeo muestra `spend > 0` o `impressions > 0` en alguna: actualizar su `last_data_date` con la fecha más reciente con datos, y hacer sync completo
+  de esa cuenta en la misma corrida (queda activa sola a partir de ahí).
+- Ventana del sync completo: 7 días (`last_7d`) en el día a día; **35 días** (rango explícito `date_from`/`date_to`, no preset — no se pudo verificar que
+  exista `last_35d` en Windsor) la primera vez que una cuenta corre, o cuando despierta del sondeo. El sync completo es **una llamada a Windsor por cuenta**
+  (no agrupado), para que un fallo en una cuenta no tumbe a las demás y el conteo de filas quede por cuenta.
+- Siempre actualizar `last_probe_at` en cada sondeo y, tras cada sync completo con datos, `last_data_date` = fecha más reciente con spend/impresiones (nunca
+  retrocede).
+- Cada corrida (una fila por cuenta y modo) se registra en `sync_runs`: `run_id`, `account_id`, `mode` (completo/sondeo), `window_days`, `rows`, `status`
+  (ok/error), `error`, `started_at`, `finished_at`. Lógica pura y testeada en `supabase/functions/sync-meta-datos/sync-plan.ts`.
+- **Verificado 2026-10-13 — primera corrida con la lógica nueva** (contra Windsor, filas en `meta_datos` coinciden en gasto y clics):
+  - Completo con backfill de 35 días: Ginecea 33 filas, Kemmerling 2184, Scuba Lodge 124, Dennys Curacao 108. Las 4 con datos hasta 2026-10-12
+    (`last_data_date = 2026-10-12`).
+  - Solo sondeo (0 filas, sin actividad): ApacheStudio Cuenta Publicitaria, Aruba Wastewater, Navigator Insurances — `last_probe_at` actualizado.
+  - `sync_runs` tiene filas repetidas por pruebas concurrentes durante la verificación; inofensivo (no afecta `ad_accounts` ni `meta_datos`, es solo
+    historial de corridas).
+
+## Dos carpetas de migraciones (no mezclar)
+- `supabase/migrations/`: migraciones SQL que escribe Claude Code, versionadas, pensadas para el flujo manual descrito en "Forma de trabajar" (Heider las
+  aplica él mismo en la base; Claude Code no tiene CLI de Supabase ni Deno en esta máquina, así que no puede aplicarlas ni desplegar funciones).
+- `drizzle/migrations/`: migraciones que genera y gestiona **la propia herramienta de Lovable** (Drizzle), aplicadas automáticamente por Lovable al
+  sincronizar. Aquí viven `0000_sync_locks.sql` (tabla `sync_locks` + RPCs `try_acquire_sync_lock`/`release_sync_lock`) y `0001_enable_pg_cron_pg_net.sql`
+  (extensiones `pg_cron`/`pg_net`).
+- **No mover archivos entre las dos carpetas.** Moverlos rompería el tracking de migraciones de la herramienta que las gestiona (Supabase CLI vs. Drizzle).
+
+## Protección de `sync-meta-datos` (implementada por Lovable, 2026-10-13)
+- La función sigue con `verify_jwt = false` en `config.toml` (necesario: el cron la llama sin JWT de usuario), pero ahora valida ella misma un secreto
+  compartido: header `x-sync-secret` comparado en tiempo constante contra el secret de función `SYNC_CRON_SECRET`. Sin header válido → `401`.
+- Candado de concurrencia (`sync_locks`, TTL 15 min): si ya hay una corrida viva, responde `409 already_running` en vez de arrancar otra.
+- Con secreto+candado ok, responde `202 {accepted:true, run_id}` de inmediato y sincroniza en segundo plano (`EdgeRuntime.waitUntil`), liberando el
+  candado al terminar (éxito o error).
+- **Pendiente**: el cron en sí. `supabase/manual/sync_meta_datos_cron.sql` ya existe (programa `sync-meta-datos-daily` a las 08:00 UTC vía `pg_net`,
+  leyendo el secreto desde Vault) pero es "ejecutar a mano en el editor SQL" — requiere primero guardar en Vault un secreto `sync_cron_secret` con el
+  MISMO valor que `SYNC_CRON_SECRET`, y luego correr ese SQL. No se ha confirmado que esté corriendo.
 
 ## Pendiente, en este orden
-1. Primer cliente con acceso: Ginecea (decidido). Falta confirmar la moneda de cada cuenta (columna `currency` de `ad_accounts`, hoy null).
-2. Cambiar `sync-meta-datos`: leer cuentas de `ad_accounts` (en vez del valor hardcodeado) y aplicar la "Regla de sincronización por cuenta" de arriba, con ventana de 7 días en el sync diario y backfill de 30 días la primera vez; crear `sync_runs`.
-3. Programar el sync diario (habilitar pg_cron + pg_net o alternativa soportada por Lovable Cloud); verificar que corre.
+1. Primer cliente con acceso: Ginecea (decidido, hecho). Moneda: el control para elegir `ad_accounts.currency` por cuenta va en la pantalla del paso 4
+   (crear cliente / adjuntar cuentas), en React — no en `admin.html` de Eclan. Por ahora **no** se agrega columna de tasa de cambio ni UI para ella:
+   se usa solo `currency` (ya existe en `ad_accounts`; Heider la llena por SQL directamente mientras tanto). La tasa de cambio se diseña cuando haga
+   falta un total que mezcle monedas distintas. **Regla de diseño ya decidida para ese momento**: `meta_datos` se queda siempre en la moneda nativa de
+   cada cuenta (nunca se convierte al escribir); la conversión, si hace falta, se hace al leer (vista o consulta), nunca al guardar el dato crudo.
+   No empezado (ver orden: espera a que el paso 3 esté confirmado funcionando).
+2. ~~Cambiar `sync-meta-datos`...~~ **Hecho** (ver "Regla de sincronización por cuenta" arriba). `sync_runs` creada y versionada
+   (`supabase/migrations/20261013000200_sync_runs.sql`).
+3. Programar el sync diario — código listo (ver "Protección de sync-meta-datos"), **falta correrlo**: guardar el secreto en Vault y ejecutar
+   `supabase/manual/sync_meta_datos_cron.sql`, luego verificar que corre.
 4. Pantalla admin: crear cliente, adjuntar cuentas, invitar miembros (usa `client_accounts` y `client_members`).
 5. Portar vistas de Eclan a React (resumen, campañas, tendencia diaria) leyendo de Supabase, filtradas por cliente.
 6. Chat con datos: Edge Function que consulta solo cuentas permitidas por `can_view_account`, con herramientas, sin SQL libre.
