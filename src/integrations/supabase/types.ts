@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -41,6 +41,48 @@ export type Database = {
           id?: string
           platform?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      ad_accounts: {
+        Row: {
+          account_id: string
+          account_name: string | null
+          active: boolean
+          agency_name: string | null
+          created_at: string
+          currency: string | null
+          last_data_date: string | null
+          last_probe_at: string | null
+          managed_by: string
+          platform: string
+          sync_mode: string
+        }
+        Insert: {
+          account_id: string
+          account_name?: string | null
+          active?: boolean
+          agency_name?: string | null
+          created_at?: string
+          currency?: string | null
+          last_data_date?: string | null
+          last_probe_at?: string | null
+          managed_by?: string
+          platform?: string
+          sync_mode?: string
+        }
+        Update: {
+          account_id?: string
+          account_name?: string | null
+          active?: boolean
+          agency_name?: string | null
+          created_at?: string
+          currency?: string | null
+          last_data_date?: string | null
+          last_probe_at?: string | null
+          managed_by?: string
+          platform?: string
+          sync_mode?: string
         }
         Relationships: []
       }
@@ -362,6 +404,75 @@ export type Database = {
           },
         ]
       }
+      client_accounts: {
+        Row: {
+          account_id: string
+          client_id: string
+          created_at: string
+        }
+        Insert: {
+          account_id: string
+          client_id: string
+          created_at?: string
+        }
+        Update: {
+          account_id?: string
+          client_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "client_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_accounts"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "client_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_members: {
+        Row: {
+          client_id: string
+          created_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cluster_runs: {
         Row: {
           client_id: string
@@ -655,6 +766,45 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_runs: {
+        Row: {
+          account_id: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          mode: string
+          rows: number | null
+          run_id: string
+          started_at: string
+          status: string
+          window_days: number | null
+        }
+        Insert: {
+          account_id: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          mode: string
+          rows?: number | null
+          run_id: string
+          started_at?: string
+          status: string
+          window_days?: number | null
+        }
+        Update: {
+          account_id?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          mode?: string
+          rows?: number | null
+          run_id?: string
+          started_at?: string
+          status?: string
+          window_days?: number | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -722,9 +872,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_client_accounts: {
+        Row: {
+          account_id: string | null
+          account_name: string | null
+          active: boolean | null
+          agency_name: string | null
+          client_id: string | null
+          client_name: string | null
+          currency: string | null
+          managed_by: string | null
+          platform: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      can_view_account: { Args: { _account_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -732,6 +904,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_client_member: { Args: { _client_id: string }; Returns: boolean }
+      is_client_owner: { Args: { _client_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
