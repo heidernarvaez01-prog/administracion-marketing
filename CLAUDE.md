@@ -34,6 +34,16 @@ Empieza con un cliente, pero debe servir para varios, y un cliente puede tener V
   Existe además un cliente "Cliente Demo" del módulo de auditoría. Aún no hay filas en `client_members` (falta crear el login de Ginecea).
   Las cuentas de The Lab no tienen cliente asignado; no crear clientes para ellas sin que Heider lo pida.
 
+## Modelo de acceso (3 niveles, aplicado y probado el 2026-10-13)
+super admin (user_roles 'admin', SOLO Heider; ve todo) → agencias (agencies, agency_members con rol manager) → clientes (audit_clients.agency_id) con viewers (client_members).
+- Agencias: ApacheStudio (propia: clientes Ginecea, ApacheStudio interno, Cliente Demo) y The Lab (5 clientes, uno por cuenta: Kemmerling, Aruba Wastewater, Scuba Lodge, Dennys Curacao, Navigator).
+- Manager de agencia: ve todos los clientes de SU agencia, sus cuentas y datos; puede crear/quitar viewers (solo role='viewer') en clientes de su agencia. No adjunta cuentas ni crea managers.
+- Viewer de cliente: ve solo las cuentas de su cliente.
+- client_accounts y client_members con rol manager solo los modifica el super admin. El rol 'manager' de client_members queda sin uso.
+- La pantalla del paso 4 NUNCA debe asignar el rol 'admin'. Plantillas de alta en supabase/manual/alta_cliente_o_cuenta.sql.
+- Una cuenta nueva de Windsor NO aparece sola: hay que insertarla en ad_accounts.
+- Corregido: antes el dueño de un audit_clients podía adjuntar cuentas/miembros; ya no.
+
 ## Regla de sincronización por cuenta (IMPLEMENTADA en `sync-meta-datos`, 2026-10-13)
 Se sincronizan las 7 cuentas (propias y de The Lab), pero sin traer datos de cuentas que no tienen:
 - `active = false` o `sync_mode = 'never'`: se omite por completo (ni siquiera sondeo).
