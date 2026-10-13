@@ -766,6 +766,27 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_locks: {
+        Row: {
+          acquired_at: string
+          holder: string
+          locked_until: string
+          name: string
+        }
+        Insert: {
+          acquired_at?: string
+          holder: string
+          locked_until: string
+          name: string
+        }
+        Update: {
+          acquired_at?: string
+          holder?: string
+          locked_until?: string
+          name?: string
+        }
+        Relationships: []
+      }
       sync_runs: {
         Row: {
           account_id: string
@@ -906,6 +927,14 @@ export type Database = {
       }
       is_client_member: { Args: { _client_id: string }; Returns: boolean }
       is_client_owner: { Args: { _client_id: string }; Returns: boolean }
+      release_sync_lock: {
+        Args: { _holder: string; _name: string }
+        Returns: undefined
+      }
+      try_acquire_sync_lock: {
+        Args: { _holder: string; _name: string; _ttl_seconds: number }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
