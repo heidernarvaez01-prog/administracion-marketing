@@ -14,7 +14,7 @@ import {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-sync-secret",
 };
 
 // Field list verified against https://windsor.ai/data-field/all/ (facebook
@@ -359,11 +359,9 @@ async function runProbe(
   return { errors, awake };
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
+// Trabajo de sync (se ejecuta en segundo plano tras validar secreto y candado).
+async function doSync(runId: string): Promise<Response> {
   const startedMs = Date.now();
-  const runId = crypto.randomUUID();
   const windsorApiKey = Deno.env.get("WINDSOR_API_KEY") ?? "";
   const json = (body: unknown, status: number) =>
     new Response(JSON.stringify(body), {
@@ -452,4 +450,55 @@ Deno.serve(async (req) => {
     console.error("sync-meta-datos error:", sanitizeError(errMsg(e), [windsorApiKey]));
     return json({ success: false, run_id: runId, error: "sync_failed" }, 500);
   }
+}
+
+const LOCK_NAME = "sync-meta-datos";
+const LOCK_TTL_SECONDS = 900; // si la función muere, el candado vence solo a los 15 min
+
+function safeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const x = enc.encode(a), y = enc.encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  // 1) Secreto compartido: sin header correcto, 401 y no se ejecuta nada.
+  const expected = Deno.env.get("SYNC_CRON_SECRET") ?? "";
+  const provided = req.headers.get("x-sync-secret") ?? "";
+  if (!expected || !provided || !safeEqual(provided, expected)) {
+    return json({ error: "unauthorized" }, 401);
+  }
+
+  // 2) Candado en la base: si hay otra corrida viva, no se arranca otra.
+  const runId = crypto.randomUUID();
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: got, error: lockErr } = await admin.rpc("try_acquire_sync_lock", {
+    _name: LOCK_NAME, _holder: runId, _ttl_seconds: LOCK_TTL_SECONDS,
+  });
+  if (lockErr) {
+    console.error("lock error:", lockErr.message);
+    return json({ error: "lock_failed" }, 500);
+  }
+  if (!got) return json({ error: "already_running" }, 409);
+
+  // 3) Responder ya (202) y sincronizar en segundo plano; el candado se libera al terminar.
+  const work = (async () => {
+    try {
+      await doSync(runId);
+    } finally {
+      await admin.rpc("release_sync_lock", { _name: LOCK_NAME, _holder: runId });
+    }
+  })();
+  // deno-lint-ignore no-explicit-any
+  (globalThis as any).EdgeRuntime?.waitUntil(work);
+  return json({ accepted: true, run_id: runId }, 202);
 });
