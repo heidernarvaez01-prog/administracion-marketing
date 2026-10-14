@@ -67,7 +67,10 @@ tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: r
 	font-size: 12px;
 }
 .ca-account-row input.ca-currency {
-	width: 56px;
+	width: 76px;
+	flex: none;
+	padding-left: 4px;
+	padding-right: 4px;
 	text-align: center;
 	text-transform: uppercase;
 	font-family: monospace;

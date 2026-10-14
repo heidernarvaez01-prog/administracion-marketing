@@ -96,22 +96,32 @@
 		return acc.managed_by === "own" ? "ApacheStudio" : (acc.agency_name || "otra agencia");
 	}
 
-	// --- Modal genérico de confirmación: un solo handler, botón deshabilitado mientras corre ---
+	// --- Modal genérico de confirmación: un solo handler, botón deshabilitado
+	// mientras corre, error visible DENTRO del modal (no detrás, en la página).
+	// "Cancelar"/X/Escape/click en el fondo disparan hidden.bs.modal por igual
+	// — ahí se limpia todo para que la próxima apertura empiece fresca.
 	var confirmModalEl = document.getElementById("confirmActionModal");
 	var $confirmBtn = $("#confirmActionBtn");
 	var $confirmTitle = $("#confirmActionTitle");
 	var $confirmBody = $("#confirmActionBody");
+	var $confirmError = $("#confirmActionError");
+
+	$(confirmModalEl).on("hidden.bs.modal", function () {
+		$confirmBtn.prop("disabled", false);
+		$confirmError.addClass("d-none").text("");
+	});
 
 	function showConfirm(title, body, onConfirm) {
 		$confirmTitle.text(title);
 		$confirmBody.text(body);
+		$confirmError.addClass("d-none").text("");
 		$confirmBtn.off("click").on("click", function () {
 			$confirmBtn.prop("disabled", true);
+			$confirmError.addClass("d-none").text("");
 			Promise.resolve().then(onConfirm).then(function () {
 				bootstrap.Modal.getOrCreateInstance(confirmModalEl).hide();
 			}).catch(function (err) {
-				setError((err && err.message) || "Error inesperado.");
-			}).then(function () {
+				$confirmError.text((err && err.message) || "Error inesperado.").removeClass("d-none");
 				$confirmBtn.prop("disabled", false);
 			});
 		});
