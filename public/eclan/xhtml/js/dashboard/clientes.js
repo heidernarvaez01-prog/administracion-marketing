@@ -145,7 +145,11 @@
 				// createElement/textContent justo después de insertar este
 				// HTML en el DOM, nunca concatenados acá (ver buildMetaStatsBlock).
 				'<div class="client-meta-stats" data-client-id="' + c.id + '"></div>' +
-				'<a href="auditoria.html?client_id=' + c.id + '" class="btn btn-outline-primary btn-sm w-100 mt-3">Abrir auditoría <i class="fa fa-arrow-right ms-1"></i></a>' +
+				// auditoria.html es solo-admin (Paso "menú por rol"); al resto
+				// no le sirve el botón y la página lo redirige igual.
+				(isAdmin
+					? '<a href="auditoria.html?client_id=' + c.id + '" class="btn btn-outline-primary btn-sm w-100 mt-3">Abrir auditoría <i class="fa fa-arrow-right ms-1"></i></a>'
+					: "") +
 				"</div>" +
 				"</div>" +
 				"</div>"
