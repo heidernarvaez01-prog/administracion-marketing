@@ -34,7 +34,7 @@ const ActiveAlertsEmail = ({
   <Html lang="es" dir="ltr">
     <Head />
     <Preview>
-      {criticalCount} alertas críticas y {warningCount} advertencias activas
+      {`${criticalCount} alertas críticas y ${warningCount} advertencias activas`}
     </Preview>
     <Body style={main}>
       <Container style={container}>
