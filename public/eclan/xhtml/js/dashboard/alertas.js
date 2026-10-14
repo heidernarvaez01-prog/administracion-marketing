@@ -30,6 +30,170 @@
 	}
 
 	var rules = [];
+	var channels = [];
+	var settings = { enabled: true, only_critical: false, notify_frequency: "daily" };
+
+	// --- Canales de notificación (puerto de src/hooks/useNotificationChannels.ts) ---
+	function getChannel(type) {
+		var found = channels.filter(function (c) { return c.channel_type === type; })[0];
+		return found || { channel_type: type, config: {}, enabled: false };
+	}
+
+	function loadChannels() {
+		return supabase.auth.getUser().then(function (userRes) {
+			var userId = userRes.data && userRes.data.user && userRes.data.user.id;
+			return supabase.from("notification_channels").select("*").eq("user_id", userId);
+		}).then(function (res) {
+			channels = res.data || [];
+			// Auto-provisiona el canal in_app si falta, igual que el hook de React.
+			if (!channels.some(function (c) { return c.channel_type === "in_app"; })) {
+				return persistChannel("in_app", {}, true, true);
+			}
+		});
+	}
+
+	function persistChannel(type, config, enabled, silent) {
+		return supabase.auth.getUser().then(function (userRes) {
+			var userId = userRes.data && userRes.data.user && userRes.data.user.id;
+			return supabase.from("notification_channels").upsert({
+				user_id: userId, channel_type: type, config: config, enabled: enabled,
+			}, { onConflict: "user_id,channel_type" });
+		}).then(function (res) {
+			if (res.error) {
+				if (!silent) $("#channelsFormError").text("Error al guardar el canal.").removeClass("d-none");
+				return;
+			}
+			return loadChannels().then(function () { if (!silent) renderChannelsTab(); });
+		});
+	}
+
+	// --- Configuración general (alert_settings) ---
+	function loadSettings() {
+		return supabase.auth.getUser().then(function (userRes) {
+			var userId = userRes.data && userRes.data.user && userRes.data.user.id;
+			return supabase.from("alert_settings").select("*").eq("user_id", userId).maybeSingle();
+		}).then(function (res) {
+			if (res.data) {
+				settings = {
+					enabled: res.data.enabled,
+					only_critical: res.data.only_critical,
+					notify_frequency: res.data.notify_frequency || "daily",
+				};
+			}
+		});
+	}
+
+	function saveSettings() {
+		settings.enabled = $("#chEnabled").is(":checked");
+		settings.only_critical = $("#onlyCritical").is(":checked");
+		settings.notify_frequency = $("#notifyFrequency").val();
+		return supabase.auth.getUser().then(function (userRes) {
+			var userId = userRes.data && userRes.data.user && userRes.data.user.id;
+			return supabase.from("alert_settings").upsert(
+				Object.assign({ user_id: userId }, settings), { onConflict: "user_id" }
+			);
+		}).then(function (res) {
+			$("#channelsSaved").addClass("d-none");
+			if (res.error) { $("#channelsFormError").text("Error al guardar la configuración.").removeClass("d-none"); return; }
+			$("#channelsFormError").addClass("d-none");
+			$("#channelsSaved").removeClass("d-none");
+			setTimeout(function () { $("#channelsSaved").addClass("d-none"); }, 2500);
+		});
+	}
+
+	function renderChannelsTab() {
+		$("#chEnabled").prop("checked", settings.enabled);
+		$("#onlyCritical").prop("checked", settings.only_critical);
+		$("#notifyFrequency").val(settings.notify_frequency);
+
+		var email = getChannel("email");
+		$("#chEmailEnabled").prop("checked", email.enabled);
+		var recipients = email.config.recipients || [];
+		$("#chEmailList").html(recipients.length
+			? recipients.map(function (e) {
+				return '<span class="badge bg-light text-dark border d-inline-flex align-items-center gap-1 py-2">' + escapeHtml(e) +
+					'<a href="javascript:;" class="remove-email-btn text-danger ms-1" data-email="' + escapeHtml(e) + '"><i class="fa fa-times"></i></a></span>';
+			}).join("")
+			: '<span class="fs-12 text-muted">Agrega al menos un correo para recibir alertas.</span>');
+
+		var slack = getChannel("slack_webhook");
+		$("#chSlackEnabled").prop("checked", slack.enabled);
+		$("#chSlackUrl").val(slack.config.webhook_url || "");
+
+		var webhook = getChannel("generic_webhook");
+		$("#chWebhookEnabled").prop("checked", webhook.enabled);
+		$("#chWebhookUrl").val(webhook.config.webhook_url || "");
+
+		$("#chInAppEnabled").prop("checked", getChannel("in_app").enabled);
+	}
+
+	function addEmailRecipient() {
+		var email = $("#chEmailInput").val().trim();
+		if (!email) return;
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			$("#channelsFormError").text("Correo inválido.").removeClass("d-none");
+			return;
+		}
+		$("#channelsFormError").addClass("d-none");
+		var current = getChannel("email");
+		var recipients = current.config.recipients || [];
+		if (recipients.indexOf(email) === -1) {
+			persistChannel("email", { recipients: recipients.concat([email]) }, true).then(renderChannelsTab);
+		}
+		$("#chEmailInput").val("");
+	}
+
+	// --- Insights de IA (campaign_ai_insights, generados por el deep-scan de alert-dispatch) ---
+	function renderAiInsights(rows) {
+		if (!rows.length) { $("#aiInsightsEmpty").removeClass("d-none"); $("#aiInsightsList").empty(); return; }
+		$("#aiInsightsEmpty").addClass("d-none");
+		$("#aiInsightsList").html('<div class="list-group list-group-flush">' + rows.map(function (r) {
+			var cls = r.severity === "critical" ? "bg-danger" : r.severity === "warning" ? "bg-warning" : "bg-info";
+			var d = new Date(r.created_at);
+			var dateLabel = isNaN(d.getTime()) ? "" : d.toLocaleDateString("es-CO");
+			return (
+				'<div class="list-group-item px-0"><div class="d-flex align-items-start gap-2">' +
+				'<span class="' + cls + '" style="width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;"></span>' +
+				'<div class="min-w-0">' +
+				'<div class="d-flex align-items-center gap-2 flex-wrap"><strong class="fs-14">' + escapeHtml(r.campaign_name) + '</strong><span class="fs-11 text-muted">' + dateLabel + "</span></div>" +
+				'<p class="fs-13 mb-0 mt-1">' + escapeHtml(r.finding) + "</p>" +
+				'<p class="fs-13 text-muted mb-0">→ ' + escapeHtml(r.recommendation) + "</p>" +
+				"</div></div></div>"
+			);
+		}).join("") + "</div>");
+	}
+
+	function loadAiInsights() {
+		return supabase.from("campaign_ai_insights").select("*")
+			.order("created_at", { ascending: false }).limit(20)
+			.then(function (res) { renderAiInsights(res.data || []); });
+	}
+
+	// --- Enviar alertas ahora (Edge Function alert-dispatch) ---
+	function sendNow() {
+		var $btn = $("#sendNowBtn");
+		$btn.prop("disabled", true).html('<span class="spinner-border spinner-border-sm me-1"></span>Enviando…');
+		$("#channelsFormError").addClass("d-none");
+		supabase.functions.invoke("alert-dispatch", { body: {} }).then(function (res) {
+			var data = res.data, error = res.error;
+			var userResult = data && data.results ? Object.values(data.results)[0] : null;
+			if (error || (data && data.error)) {
+				var msg = (error && error.message) || (data && data.error) || "Error desconocido";
+				$("#channelsFormError").text("Error al enviar: " + msg).removeClass("d-none");
+			} else if (!userResult || !userResult.sent) {
+				$("#channelsSaved").removeClass("d-none").text("No se envió nada — verifica que al menos un canal esté habilitado, o que haya alertas activas.");
+				setTimeout(function () { $("#channelsSaved").addClass("d-none"); }, 4000);
+			} else {
+				var channelList = (userResult.channels || []).map(function (c) { return c.channel; }).join(", ");
+				$("#channelsSaved").removeClass("d-none").text(userResult.sent + " alerta(s) enviada(s) por " + (channelList || "ningún canal") + ".");
+				setTimeout(function () { $("#channelsSaved").addClass("d-none"); }, 4000);
+			}
+		}).catch(function (e) {
+			$("#channelsFormError").text("Error al enviar: " + e.message).removeClass("d-none");
+		}).then(function () {
+			$btn.prop("disabled", false).html('<i class="fa fa-paper-plane me-1"></i>Enviar alertas ahora');
+		});
+	}
 
 	function loadRules() {
 		return supabase.auth.getUser().then(function (userRes) {
@@ -169,11 +333,44 @@
 
 	$("#logoutLink").on("click", function (e) { e.preventDefault(); AuditClient.signOut(); });
 
+	// --- Eventos: tab "Canales" ---
+	$("#chEmailAdd").on("click", addEmailRecipient);
+	$("#chEmailInput").on("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addEmailRecipient(); } });
+	$(document).on("click", ".remove-email-btn", function () {
+		var email = $(this).data("email");
+		var current = getChannel("email");
+		var recipients = (current.config.recipients || []).filter(function (e) { return e !== email; });
+		persistChannel("email", { recipients: recipients }, current.enabled).then(renderChannelsTab);
+	});
+	$("#chEmailEnabled").on("change", function () {
+		persistChannel("email", getChannel("email").config, $(this).is(":checked")).then(renderChannelsTab);
+	});
+	$("#chSlackEnabled").on("change", function () {
+		persistChannel("slack_webhook", getChannel("slack_webhook").config, $(this).is(":checked")).then(renderChannelsTab);
+	});
+	$("#chSlackUrl").on("blur", function () {
+		var val = $(this).val().trim();
+		if (val) persistChannel("slack_webhook", { webhook_url: val }, true).then(renderChannelsTab);
+	});
+	$("#chWebhookEnabled").on("change", function () {
+		persistChannel("generic_webhook", getChannel("generic_webhook").config, $(this).is(":checked")).then(renderChannelsTab);
+	});
+	$("#chWebhookUrl").on("blur", function () {
+		var val = $(this).val().trim();
+		if (val) persistChannel("generic_webhook", { webhook_url: val }, true).then(renderChannelsTab);
+	});
+	$("#chInAppEnabled").on("change", function () {
+		persistChannel("in_app", {}, $(this).is(":checked")).then(renderChannelsTab);
+	});
+	$("#saveSettingsBtn").on("click", saveSettings);
+	$("#sendNowBtn").on("click", sendNow);
+
 	AuditClient.getSession().then(function (session) {
 		if (!session) { showOnly($authRequired); window.location.replace("page-login.html"); return; }
 		showOnly($loading);
-		loadRules().then(function () {
+		Promise.all([loadRules(), loadChannels(), loadSettings(), loadAiInsights()]).then(function () {
 			renderRules();
+			renderChannelsTab();
 			return supabase.from("audit_clients").select("id").limit(1);
 		}).then(function (res) {
 			if (res.error) { showOnly($migrationPending); return; }

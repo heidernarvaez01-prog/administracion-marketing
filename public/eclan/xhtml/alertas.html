@@ -1014,14 +1014,125 @@
 					<ul class="nav nav-tabs mt-2" role="tablist">
 						<li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabActividad">Actividad</a></li>
 						<li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabReglas">Reglas</a></li>
+						<li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCanales">Canales</a></li>
 					</ul>
 					<div class="tab-content pt-3">
 						<div class="tab-pane fade show active" id="tabActividad">
+							<!-- Insights de IA: hallazgos del deep-scan diario, fuera de las reglas fijas -->
+							<div class="card mb-3" id="aiInsightsCard">
+								<div class="card-header d-flex align-items-center gap-2">
+									<i class="fa fa-magic text-primary"></i>
+									<div>
+										<h5 class="mb-0">Insights de IA</h5>
+										<span class="fs-12 text-muted">Campañas cuyos números se movieron fuera de su propia línea base — revisado a diario, sin regla fija.</span>
+									</div>
+								</div>
+								<div class="card-body">
+									<div id="aiInsightsEmpty" class="text-muted fs-13 d-none">Aún no hay hallazgos de IA — el escaneo diario solo marca campañas cuyas métricas realmente se desviaron de su propia línea base reciente.</div>
+									<div id="aiInsightsList"></div>
+								</div>
+							</div>
 							<div id="alertsEmpty" class="card d-none"><div class="card-body text-center py-5 text-muted"><i class="la la-check-circle" style="font-size:40px;"></i><p class="mt-2 mb-0">Todo en orden — ninguna campaña activó una alerta ahora mismo.</p></div></div>
 							<div id="alertsFeed"></div>
 						</div>
 						<div class="tab-pane fade" id="tabReglas">
 							<div id="rulesList"></div>
+						</div>
+						<div class="tab-pane fade" id="tabCanales">
+							<div class="card">
+								<div class="card-header d-flex align-items-center gap-2">
+									<i class="fa fa-envelope-o text-primary"></i>
+									<h5 class="mb-0">Entrega y canales</h5>
+								</div>
+								<div class="card-body">
+									<div id="channelsFormError" class="alert alert-danger py-2 px-3 d-none"></div>
+									<div id="channelsSaved" class="alert alert-success py-2 px-3 d-none">Configuración guardada.</div>
+
+									<div class="d-flex align-items-center justify-content-between border rounded p-3 mb-3">
+										<div>
+											<h6 class="mb-0">Alertas habilitadas</h6>
+											<span class="fs-12 text-muted">Interruptor maestro — apaga todos los canales de abajo.</span>
+										</div>
+										<div class="form-check form-switch">
+											<input class="form-check-input" type="checkbox" id="chEnabled">
+										</div>
+									</div>
+
+									<!-- Canal: Email -->
+									<div class="border rounded p-3 mb-3">
+										<div class="d-flex align-items-center justify-content-between mb-2">
+											<h6 class="mb-0"><i class="fa fa-envelope me-1"></i> Correo</h6>
+											<div class="form-check form-switch">
+												<input class="form-check-input" type="checkbox" id="chEmailEnabled">
+											</div>
+										</div>
+										<div class="input-group mb-2">
+											<input type="email" class="form-control" id="chEmailInput" placeholder="alguien@empresa.com">
+											<button type="button" class="btn btn-outline-primary" id="chEmailAdd"><i class="fa fa-plus"></i></button>
+										</div>
+										<div id="chEmailList" class="d-flex flex-wrap gap-2"></div>
+									</div>
+
+									<!-- Canal: Slack -->
+									<div class="border rounded p-3 mb-3">
+										<div class="d-flex align-items-center justify-content-between mb-2">
+											<h6 class="mb-0"><i class="fa fa-slack me-1"></i> Slack (webhook entrante)</h6>
+											<div class="form-check form-switch">
+												<input class="form-check-input" type="checkbox" id="chSlackEnabled">
+											</div>
+										</div>
+										<input type="url" class="form-control" id="chSlackUrl" placeholder="https://hooks.slack.com/services/...">
+									</div>
+
+									<!-- Canal: Webhook genérico -->
+									<div class="border rounded p-3 mb-3">
+										<div class="d-flex align-items-center justify-content-between mb-2">
+											<h6 class="mb-0"><i class="fa fa-plug me-1"></i> Webhook genérico</h6>
+											<div class="form-check form-switch">
+												<input class="form-check-input" type="checkbox" id="chWebhookEnabled">
+											</div>
+										</div>
+										<input type="url" class="form-control mb-1" id="chWebhookUrl" placeholder="https://tu-endpoint.ejemplo.com/alertas">
+										<span class="fs-12 text-muted">Envía un JSON por POST con las alertas activas — construye tu propia integración (WhatsApp, SMS, etc.) sobre esto.</span>
+									</div>
+
+									<!-- Canal: In-app -->
+									<div class="d-flex align-items-center justify-content-between border rounded p-3 mb-3">
+										<div>
+											<h6 class="mb-0"><i class="fa fa-bell me-1"></i> Notificaciones en la app</h6>
+											<span class="fs-12 text-muted">Se muestran en el ícono de campana — sin configuración necesaria.</span>
+										</div>
+										<div class="form-check form-switch">
+											<input class="form-check-input" type="checkbox" id="chInAppEnabled">
+										</div>
+									</div>
+
+									<div class="row mb-3">
+										<div class="col-md-6 mb-3 mb-md-0">
+											<label class="form-label">Frecuencia</label>
+											<select class="form-control" id="notifyFrequency">
+												<option value="daily">Diaria</option>
+												<option value="weekly">Semanal</option>
+												<option value="manual">Solo manual</option>
+											</select>
+										</div>
+										<div class="col-md-6 d-flex align-items-center justify-content-between">
+											<div>
+												<label class="form-label mb-0">Solo críticas</label>
+												<div class="fs-12 text-muted">Ignora advertencias en todos los canales.</div>
+											</div>
+											<div class="form-check form-switch">
+												<input class="form-check-input" type="checkbox" id="onlyCritical">
+											</div>
+										</div>
+									</div>
+
+									<div class="d-flex justify-content-end gap-2">
+										<button type="button" class="btn btn-outline-secondary" id="sendNowBtn"><i class="fa fa-paper-plane me-1"></i>Enviar alertas ahora</button>
+										<button type="button" class="btn btn-primary" id="saveSettingsBtn"><i class="fa fa-save me-1"></i>Guardar configuración</button>
+									</div>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
