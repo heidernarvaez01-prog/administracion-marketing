@@ -1,76 +1,78 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { PLATAFORMAS, type Plataforma } from "./plataformas.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Campos base validados contra la cuenta real de Windsor.ai (no cambiar
-// sin volver a validar en la cuenta, algunos connectors no traen todos).
-const WINDSOR_FIELDS = [
-  "date",
-  "datasource",
-  "account_name",
-  "source",
-  "campaign",
-  "adset_name",
-  "ad_name",
-  "clicks",
-  "spend",
-  "impressions",
-  "reach",
-  "cpc",
-  "cpm",
-  "objective",
-  "campaign_objective",
-  "image_url",
-].join(",");
+// Antes llamaba a Windsor.ai en vivo, sin login y sin filtrar por cuenta —
+// cualquiera con la anon key veía el gasto agregado de las 7 cuentas
+// conectadas. Ahora lee meta_datos (ya sincronizada a diario por
+// sync-meta-datos) con el JWT de quien llama, para que RLS filtre solo lo
+// que esa cuenta/cliente/agencia puede ver. Sin sesión válida -> 401.
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-const WINDSOR_URL = "https://connectors.windsor.ai/all";
-const DEFAULT_DATE_PRESET = "last_90d";
+interface DailyTotalRow {
+  fecha: string;
+  currency: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+}
 
-interface WindsorRow {
-  date: string;
-  datasource: string;
-  account_name?: string;
-  source?: string;
-  campaign?: string;
-  adset_name?: string;
-  ad_name?: string;
-  clicks?: number;
-  spend?: number;
-  impressions?: number;
-  reach?: number;
-  cpc?: number;
-  cpm?: number;
-  objective?: string;
-  campaign_objective?: string;
-  image_url?: string;
+interface CampaignTotalRow {
+  client_id: string;
+  account_id: string;
+  currency: string;
+  campaign_id: string;
+  campaign_name: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  first_fecha: string;
+  last_fecha: string;
 }
 
 function round(n: number, decimals = 2): number {
   const factor = 10 ** decimals;
-  return Math.round((n + Number.EPSILON) * factor) / factor;
+  return Math.round((Number(n || 0) + Number.EPSILON) * factor) / factor;
 }
 
-function num(v: unknown): number {
-  const n = typeof v === "number" ? v : parseFloat(String(v ?? 0));
-  return Number.isFinite(n) ? n : 0;
+// Preset heredado de windsor-client.js (compaign.js/analytics.js lo siguen
+// mandando tal cual) -> ventana en días para los RPC nuevos.
+function daysFromPreset(datePreset: string | null): number {
+  if (datePreset === "last_7d") return 7;
+  if (datePreset === "last_30d") return 30;
+  return 90; // default histórico de esta función (last_90d)
 }
 
-function emptyPlataformaMetrics(p: Plataforma) {
-  return {
-    id: p.id,
-    nombre: p.nombre,
-    conectado: false,
-    clicks: 0,
-    spend: 0,
-    impressions: 0,
-    cpc: 0,
-    cpm: 0,
-    campañas: 0,
-  };
+// PostgREST corta cualquier select en 1000 filas por página, sin avisar —
+// confirmado con Kemmerling: 1357 filas en 90 días en v_meta_daily_campaign.
+// Sin paginar, eso trunca los últimos días/campañas en silencio. Se pagina
+// con .range() en orden estable (fecha, campaign_id) hasta que una página
+// traiga menos de PAGE_SIZE filas, con un tope de seguridad: si se supera,
+// error explícito en vez de datos incompletos.
+const PAGE_SIZE = 1000;
+const MAX_ROWS = 20000;
+
+async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  let offset = 0;
+  for (;;) {
+    const { data, error } = await page(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    all.push(...rows);
+    if (all.length > MAX_ROWS) {
+      throw new Error(`v_meta_daily_campaign devolvió más de ${MAX_ROWS} filas — acorta el rango antes de seguir (sin esto, mostraríamos datos truncados).`);
+    }
+    if (rows.length < PAGE_SIZE) return all;
+    offset += PAGE_SIZE;
+  }
 }
 
 serve(async (req) => {
@@ -85,313 +87,176 @@ serve(async (req) => {
     });
 
   try {
-    const WINDSOR_API_KEY = Deno.env.get("WINDSOR_API_KEY");
-
-    if (!WINDSOR_API_KEY) {
-      return jsonResponse(
-        { error: true, status: 500, mensaje: "WINDSOR_API_KEY no está configurada en las secrets de Supabase." },
-        500,
-      );
-    }
-
-    // Permite override puntual desde el frontend (?date_preset=last_30d),
-    // pero por defecto usa el rango ya validado.
-    const reqUrl = new URL(req.url);
-    const datePreset = reqUrl.searchParams.get("date_preset") || DEFAULT_DATE_PRESET;
-    // ?raw=1: agrega dailyCampaignTotals + campaignNames al response (ver
-    // más abajo) — lo usa el motor de auditoría/pacing (Eclan) para hacer
-    // el match por nombre de campaña y sumar gasto día a día dentro del
-    // rango de cada audit_record, sin necesitar una tabla propia.
-    const includeRaw = reqUrl.searchParams.get("raw") === "1";
-
-    const windsorUrl = new URL(WINDSOR_URL);
-    windsorUrl.searchParams.set("api_key", WINDSOR_API_KEY);
-    windsorUrl.searchParams.set("fields", WINDSOR_FIELDS);
-    windsorUrl.searchParams.set("date_preset", datePreset);
-
-    const windsorRes = await fetch(windsorUrl.toString());
-
-    if (!windsorRes.ok) {
-      const detalle = await windsorRes.text().catch(() => "");
-      return jsonResponse(
-        {
-          error: true,
-          status: windsorRes.status,
-          mensaje: `Windsor.ai respondió con error ${windsorRes.status}${detalle ? `: ${detalle.slice(0, 500)}` : ""}`,
-        },
-        windsorRes.status,
-      );
-    }
-
-    const payload = await windsorRes.json().catch(() => null);
-    const rows: WindsorRow[] = Array.isArray(payload?.data) ? payload.data : [];
-
-    // ------------------------------------------------------------------
-    // 1) Plataformas esperadas vs. lo que realmente llegó de Windsor
-    // ------------------------------------------------------------------
-    const plataformas = PLATAFORMAS.map((p) => {
-      const filas = rows.filter((r) => r.datasource === p.id || r.source === p.id);
-
-      if (filas.length === 0) {
-        return emptyPlataformaMetrics(p);
-      }
-
-      const clicks = filas.reduce((acc, r) => acc + num(r.clicks), 0);
-      const spend = filas.reduce((acc, r) => acc + num(r.spend), 0);
-      const impressions = filas.reduce((acc, r) => acc + num(r.impressions), 0);
-      const campañas = new Set(filas.map((r) => r.campaign).filter(Boolean)).size;
-
-      return {
-        id: p.id,
-        nombre: p.nombre,
-        conectado: true,
-        clicks: round(clicks, 0),
-        spend: round(spend, 2),
-        impressions: round(impressions, 0),
-        // cpc/cpm recalculados desde los totales (más preciso que promediar
-        // el cpc/cpm fila por fila).
-        cpc: clicks > 0 ? round(spend / clicks, 4) : 0,
-        cpm: impressions > 0 ? round((spend / impressions) * 1000, 4) : 0,
-        campañas,
-      };
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
     });
 
-    // Filas de plataformas NO listadas en plataformas.ts (por si Windsor
-    // trae un connector nuevo que todavía no agregamos) — se reportan
-    // aparte para que se note en la respuesta, sin romper el shape fijo.
-    const idsEsperados = new Set(PLATAFORMAS.map((p) => p.id));
-    const otrasPlataformas = Array.from(
-      new Set(rows.map((r) => r.datasource).filter((d) => d && !idsEsperados.has(d))),
-    );
+    // Explícito: con solo la anon key (sin sesión real) esto no debe dar
+    // 200 con datos vacíos, debe dar 401 — RLS sola no distingue los casos.
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData?.user) {
+      return jsonResponse({ error: true, status: 401, mensaje: "Sesión requerida." }, 401);
+    }
 
-    // ------------------------------------------------------------------
-    // 2) KPIs generales
-    // ------------------------------------------------------------------
-    const totalClicks = rows.reduce((acc, r) => acc + num(r.clicks), 0);
-    const totalImpressions = rows.reduce((acc, r) => acc + num(r.impressions), 0);
-    const totalSpend = rows.reduce((acc, r) => acc + num(r.spend), 0);
-    const totalCampaigns = new Set(rows.map((r) => r.campaign).filter(Boolean)).size;
+    const reqUrl = new URL(req.url);
+    const days = daysFromPreset(reqUrl.searchParams.get("date_preset"));
+    const clientId = reqUrl.searchParams.get("client_id") || null;
+    const accountId = reqUrl.searchParams.get("account_id") || null;
+    const includeRaw = reqUrl.searchParams.get("raw") === "1";
+
+    // Motor de auditoría/pacing (auditoria.js): necesita gasto por día Y
+    // por campaña, no solo totales. v_meta_daily_campaign ya tiene ese
+    // grano exacto (RLS-scoped), pero sin acotar por cliente una consulta
+    // así podría pasar las 1000 filas que corta PostgREST — por eso
+    // client_id es obligatorio en este modo (auditoria.html siempre
+    // navega con un client_id en la URL).
+    if (includeRaw) {
+      if (!clientId) {
+        return jsonResponse({ error: true, status: 400, mensaje: "raw=1 requiere client_id." }, 400);
+      }
+      const rows = await fetchAllRows<{
+        fecha: string; campaign_id: string; campaign_name: string;
+        spend: number; impressions: number; clicks: number;
+      }>((from, to) =>
+        supabase
+          .from("v_meta_daily_campaign")
+          .select("fecha, campaign_id, campaign_name, spend, impressions, clicks")
+          .eq("client_id", clientId)
+          .order("fecha", { ascending: true })
+          .order("campaign_id", { ascending: true })
+          .range(from, to),
+      );
+      const dailyCampaignTotals = rows.map((r) => ({
+        date: r.fecha,
+        campaign: r.campaign_name,
+        datasource: "META",
+        clicks: round(r.clicks, 0),
+        spend: round(r.spend),
+        impressions: round(r.impressions, 0),
+      }));
+      const campaignNames = Array.from(new Set(rows.map((r) => r.campaign_name).filter(Boolean))).sort();
+
+      // El motor de auditoría solo necesita esto — no hace falta correr
+      // también los RPC de totales/KPIs que usan compaign.html/analytics.html.
+      return jsonResponse({
+        error: false,
+        generatedAt: new Date().toISOString(),
+        dailyCampaignTotals,
+        campaignNames,
+      });
+    }
+
+    const [dailyRes, campaignRes] = await Promise.all([
+      supabase.rpc("meta_daily_totals", { _days: days, _client_id: clientId }),
+      supabase.rpc("meta_campaign_totals", { _days: days, _client_id: clientId }),
+    ]);
+
+    if (dailyRes.error) throw dailyRes.error;
+    if (campaignRes.error) throw campaignRes.error;
+
+    let dailyRows: DailyTotalRow[] = dailyRes.data || [];
+    let campaignRows: CampaignTotalRow[] = campaignRes.data || [];
+
+    // account_id es un filtro más fino que client_id (una cuenta específica
+    // dentro del cliente); los RPC solo aceptan _client_id, así que ese
+    // recorte se aplica acá, sobre filas que RLS ya acotó.
+    if (accountId) {
+      campaignRows = campaignRows.filter((r) => r.account_id === accountId);
+    }
+
+    const currencies = Array.from(
+      new Set([...dailyRows.map((r) => r.currency), ...campaignRows.map((r) => r.currency)]),
+    ).sort();
+
+    // Nunca se suman monedas distintas: se elige la de mayor gasto como
+    // "principal" para el shape plano que compaign.html/analytics.html ya
+    // consumen (ninguna de las dos tiene UI multi-moneda todavía). Para un
+    // viewer/manager de un solo cliente esto nunca aplica (una sola moneda).
+    const spendByCurrency = new Map<string, number>();
+    for (const r of dailyRows) spendByCurrency.set(r.currency, (spendByCurrency.get(r.currency) ?? 0) + Number(r.spend || 0));
+    const primaryCurrency = currencies.length
+      ? [...spendByCurrency.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? currencies[0]
+      : "USD";
+
+    const dailyPrimary = dailyRows.filter((r) => r.currency === primaryCurrency).sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+    const campaignsPrimary = campaignRows.filter((r) => r.currency === primaryCurrency).sort((a, b) => b.spend - a.spend);
+
+    const totalSpend = dailyPrimary.reduce((acc, r) => acc + Number(r.spend || 0), 0);
+    const totalClicks = dailyPrimary.reduce((acc, r) => acc + Number(r.clicks || 0), 0);
+    const totalImpressions = dailyPrimary.reduce((acc, r) => acc + Number(r.impressions || 0), 0);
+    const totalCampaigns = campaignsPrimary.length;
     const ctr = totalImpressions > 0 ? round((totalClicks / totalImpressions) * 100, 2) : 0;
-
-    const fechasOrdenadas = Array.from(new Set(rows.map((r) => r.date).filter(Boolean))).sort();
-    const ultimaFecha = fechasOrdenadas[fechasOrdenadas.length - 1] ?? null;
-    const fechaAnterior = fechasOrdenadas[fechasOrdenadas.length - 2] ?? null;
-
-    const spendPorFecha = (fecha: string | null) =>
-      fecha === null ? 0 : round(rows.filter((r) => r.date === fecha).reduce((acc, r) => acc + num(r.spend), 0), 2);
+    const lastFecha = dailyPrimary.length ? dailyPrimary[dailyPrimary.length - 1].fecha : null;
+    const prevFecha = dailyPrimary.length > 1 ? dailyPrimary[dailyPrimary.length - 2].fecha : null;
+    const spendOn = (fecha: string | null) =>
+      fecha === null ? 0 : round(dailyPrimary.filter((r) => r.fecha === fecha).reduce((acc, r) => acc + Number(r.spend || 0), 0));
 
     const kpis = {
       totalCampaigns,
       totalClicks: round(totalClicks, 0),
       totalImpressions: round(totalImpressions, 0),
-      totalSpend: round(totalSpend, 2),
-      // "Spends Today/Yesterday" del template: usamos la última y penúltima
-      // fecha con datos (Windsor puede tener 1-2 días de retraso).
-      spendToday: spendPorFecha(ultimaFecha),
-      spendYesterday: spendPorFecha(fechaAnterior),
+      totalSpend: round(totalSpend),
+      spendToday: spendOn(lastFecha),
+      spendYesterday: spendOn(prevFecha),
       ctr,
     };
 
-    // ------------------------------------------------------------------
-    // 3) Series por día — para Chart.js (chart-chartjs "labels"/"datasets")
-    //    Se usan los últimos 20 puntos para calzar con el eje X original
-    //    de analytics.html ("01".."20").
-    // ------------------------------------------------------------------
-    const ultimasFechas = fechasOrdenadas.slice(-20);
-
     const clickSummary = {
-      labels: ultimasFechas,
-      data: ultimasFechas.map((f) =>
-        round(rows.filter((r) => r.date === f).reduce((acc, r) => acc + num(r.clicks), 0), 0),
-      ),
+      labels: dailyPrimary.map((r) => r.fecha),
+      data: dailyPrimary.map((r) => round(r.clicks, 0)),
     };
-
-    // No existe un campo de "conversiones" en los fields que valida esta
-    // cuenta de Windsor (solo clicks/spend/impressions/cpc/cpm). En vez de
-    // inventar un número, este panel usa gasto diario real. Ver README del
-    // Paso 5 / mensaje al usuario para el detalle.
     const spendSummary = {
-      labels: ultimasFechas,
-      data: ultimasFechas.map((f) =>
-        round(rows.filter((r) => r.date === f).reduce((acc, r) => acc + num(r.spend), 0), 2),
-      ),
+      labels: dailyPrimary.map((r) => r.fecha),
+      data: dailyPrimary.map((r) => round(r.spend)),
     };
 
-    // ------------------------------------------------------------------
-    // 4) Distribución por objetivo de campaña — para el radialBar
-    //    "Goal Statistic" (chartCircle)
-    // ------------------------------------------------------------------
-    const clicksPorObjetivo = new Map<string, number>();
-    for (const r of rows) {
-      const key = r.campaign_objective || r.objective || "Sin objetivo";
-      clicksPorObjetivo.set(key, (clicksPorObjetivo.get(key) ?? 0) + num(r.clicks));
-    }
-    const objetivosOrdenados = Array.from(clicksPorObjetivo.entries()).sort((a, b) => b[1] - a[1]);
-    const top3Objetivos = objetivosOrdenados.slice(0, 3);
-    const totalClicksObjetivo = objetivosOrdenados.reduce((acc, [, v]) => acc + v, 0);
-
-    const objectiveBreakdown = {
-      labels: top3Objetivos.map(([label]) => label),
-      series: top3Objetivos.map(([, v]) => (totalClicksObjetivo > 0 ? round((v / totalClicksObjetivo) * 100, 0) : 0)),
-    };
-
-    // CTR global como gauge único (chartratio)
-    const ctrGauge = ctr;
-
-    // ------------------------------------------------------------------
-    // 5) Clicks por día y por plataforma — para el ApexCharts columnChart
-    //    "Ads Engagement" (categorías = fechas, series = plataformas)
-    // ------------------------------------------------------------------
-    const engagementByPlatform = {
-      categories: ultimasFechas,
-      series: PLATAFORMAS.map((p) => ({
-        name: p.nombre,
-        data: ultimasFechas.map((f) =>
-          round(
-            rows
-              .filter((r) => (r.datasource === p.id || r.source === p.id) && r.date === f)
-              .reduce((acc, r) => acc + num(r.clicks), 0),
-            0,
-          ),
-        ),
-      })),
-    };
-
-    // ------------------------------------------------------------------
-    // 6) Top anuncios por gasto — para "Most Performed Ads" / "Trending Ads"
-    // ------------------------------------------------------------------
-    const porAnuncio = new Map<
-      string,
-      { adName: string; campaign: string; datasource: string; imageUrl: string; spend: number; clicks: number; impressions: number }
-    >();
-    for (const r of rows) {
-      const key = `${r.datasource}::${r.campaign}::${r.ad_name}`;
-      const acc = porAnuncio.get(key) ?? {
-        adName: r.ad_name || "(sin nombre)",
-        campaign: r.campaign || "(sin campaña)",
-        datasource: r.datasource,
-        imageUrl: r.image_url || "",
-        spend: 0,
-        clicks: 0,
-        impressions: 0,
-      };
-      acc.spend += num(r.spend);
-      acc.clicks += num(r.clicks);
-      acc.impressions += num(r.impressions);
-      if (!acc.imageUrl && r.image_url) acc.imageUrl = r.image_url;
-      porAnuncio.set(key, acc);
-    }
-    const topAds = Array.from(porAnuncio.values())
-      .sort((a, b) => b.spend - a.spend)
-      .slice(0, 5)
-      .map((a) => ({
-        ...a,
-        spend: round(a.spend, 2),
-        clicks: round(a.clicks, 0),
-        impressions: round(a.impressions, 0),
-      }));
-
-    // ------------------------------------------------------------------
-    // 7) Campañas agrupadas — para compaign.html (lista de campañas)
-    // ------------------------------------------------------------------
-    const porCampaña = new Map<
-      string,
-      { campaign: string; datasource: string; spend: number; clicks: number; impressions: number; lastDate: string }
-    >();
-    for (const r of rows) {
-      const key = `${r.datasource}::${r.campaign}`;
-      const acc = porCampaña.get(key) ?? {
-        campaign: r.campaign || "(sin nombre)",
-        datasource: r.datasource,
-        spend: 0,
-        clicks: 0,
-        impressions: 0,
-        lastDate: r.date,
-      };
-      acc.spend += num(r.spend);
-      acc.clicks += num(r.clicks);
-      acc.impressions += num(r.impressions);
-      if (r.date > acc.lastDate) acc.lastDate = r.date;
-      porCampaña.set(key, acc);
-    }
-
-    // "On Going" si tuvo actividad en los últimos 3 días de datos
-    // disponibles (Windsor puede ir 1-2 días atrás); si no, "Expired".
-    const fechaCorte = fechasOrdenadas.length
-      ? new Date(new Date(fechasOrdenadas[fechasOrdenadas.length - 1]).getTime() - 3 * 24 * 60 * 60 * 1000)
+    // "status" heredado de la versión vieja: activa si tuvo gasto en los
+    // últimos 3 días con datos disponibles.
+    const fechaCorte = lastFecha
+      ? new Date(new Date(lastFecha).getTime() - 3 * 24 * 60 * 60 * 1000)
       : null;
 
-    const campaigns = Array.from(porCampaña.values())
-      .map((c) => ({
-        campaign: c.campaign,
-        datasource: c.datasource,
-        spend: round(c.spend, 2),
-        clicks: round(c.clicks, 0),
-        impressions: round(c.impressions, 0),
-        ctr: c.impressions > 0 ? round((c.clicks / c.impressions) * 100, 2) : 0,
-        status: fechaCorte && new Date(c.lastDate) >= fechaCorte ? "On Going" : "Expired",
-        lastDate: c.lastDate,
-      }))
-      .sort((a, b) => b.spend - a.spend);
+    const campaigns = campaignsPrimary.map((c) => ({
+      campaign: c.campaign_name || "(sin nombre)",
+      datasource: "META", // meta_datos no distingue red (siempre 'META')
+      spend: round(c.spend),
+      clicks: round(c.clicks, 0),
+      impressions: round(c.impressions, 0),
+      ctr: c.impressions > 0 ? round((c.clicks / c.impressions) * 100, 2) : 0,
+      status: fechaCorte && new Date(c.last_fecha) >= fechaCorte ? "On Going" : "Expired",
+      lastDate: c.last_fecha,
+    }));
 
-    // ------------------------------------------------------------------
-    // 8) Datos crudos por día y campaña — sólo si ?raw=1 (motor de
-    //    auditoría/pacing). Un registro por (fecha, campaña), sumando
-    //    todas las plataformas/adsets/anuncios de esa campaña ese día.
-    // ------------------------------------------------------------------
-    let dailyCampaignTotals: {
-      date: string; campaign: string; datasource: string;
-      clicks: number; spend: number; impressions: number; reach: number;
-    }[] | undefined;
-    let campaignNames: string[] | undefined;
+    // "topAds": ya no hay nivel de anuncio/imagen en meta_datos (sin
+    // image_url ni ad_id en los RPC) — se simplifica a top campañas por
+    // gasto, reusando la misma forma que ya consume analytics.js.
+    const topAds = campaigns.slice(0, 5).map((c) => ({
+      campaign: c.campaign,
+      adName: c.campaign,
+      datasource: c.datasource,
+      spend: c.spend,
+      clicks: c.clicks,
+      impressions: c.impressions,
+    }));
 
-    if (includeRaw) {
-      const porFechaCampaña = new Map<
-        string,
-        { date: string; campaign: string; datasource: string; clicks: number; spend: number; impressions: number; reach: number }
-      >();
-      for (const r of rows) {
-        if (!r.campaign || !r.date) continue;
-        const key = `${r.date}::${r.campaign}`;
-        const acc = porFechaCampaña.get(key) ?? {
-          date: r.date,
-          campaign: r.campaign,
-          datasource: r.datasource,
-          clicks: 0,
-          spend: 0,
-          impressions: 0,
-          reach: 0,
-        };
-        acc.clicks += num(r.clicks);
-        acc.spend += num(r.spend);
-        acc.impressions += num(r.impressions);
-        acc.reach += num(r.reach);
-        porFechaCampaña.set(key, acc);
-      }
-      dailyCampaignTotals = Array.from(porFechaCampaña.values())
-        .map((r) => ({ ...r, clicks: round(r.clicks, 0), spend: round(r.spend, 2), impressions: round(r.impressions, 0), reach: round(r.reach, 0) }))
-        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-      campaignNames = Array.from(new Set(rows.map((r) => r.campaign).filter(Boolean))).sort() as string[];
-    }
-
-    // ------------------------------------------------------------------
-    // Shape final — siempre el mismo, haya o no plataformas conectadas.
-    // ------------------------------------------------------------------
     return jsonResponse({
       error: false,
       generatedAt: new Date().toISOString(),
-      datePreset,
-      plataformas,
-      otrasPlataformasDetectadas: otrasPlataformas, // connectors nuevos no listados en plataformas.ts
+      currency: primaryCurrency,
+      currencies,
       kpis,
       clickSummary,
       spendSummary,
-      objectiveBreakdown,
-      ctrGauge,
-      engagementByPlatform,
-      topAds,
       campaigns,
-      ...(includeRaw ? { dailyCampaignTotals, campaignNames } : {}),
+      topAds,
+      // Sin equivalente real en meta_datos (no hay desglose por red ni por
+      // campaign_objective) — se devuelven vacíos; compaign.html/
+      // analytics.html ya tienen manejo de "sin datos" para estos campos.
+      plataformas: [],
+      objectiveBreakdown: { labels: [], series: [] },
+      ctrGauge: ctr,
+      engagementByPlatform: { categories: [], series: [] },
     });
   } catch (error: unknown) {
     const mensaje = error instanceof Error ? error.message : "Error desconocido";

@@ -409,7 +409,7 @@
 	}
 
 	function loadWindsorData() {
-		return WindsorClient.fetchMetrics({ raw: true }).then(function (data) {
+		return WindsorClient.fetchMetrics({ raw: true, clientId: clientId }).then(function (data) {
 			dailyCampaignTotals = data.dailyCampaignTotals || [];
 			var campaignNames = data.campaignNames || [];
 			$("#campaignOptions").html(campaignNames.map(function (c) {

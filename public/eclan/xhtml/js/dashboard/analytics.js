@@ -72,41 +72,44 @@
 		$container.html(html);
 	}
 
+	// createElement/textContent para ad.campaign/ad.adName/ad.datasource: son
+	// datos reales de Meta (meta_datos), nunca HTML de confianza.
 	function renderAdList(selector, ads, valueLabel) {
 		var $container = $(selector);
 		if ($container.length === 0) return;
 
 		if (!ads.length) {
-			$container.html('<p class="text-muted mb-0">Sin datos de anuncios en el rango consultado.</p>');
+			$container.empty().append($("<p>", { class: "text-muted mb-0", text: "Sin datos de anuncios en el rango consultado." }));
 			return;
 		}
 
-		var html = ads
-			.map(function (ad, i) {
-				var last = i === ads.length - 1;
-				return (
-					'<div class="row mb-4' + (last ? "" : " border-bottom") + ' sp10 align-items-center">' +
-					'<div class="mb-4 col-md-7 col-sm-6 col-xxl-5">' +
-					'<p class="text-primary mb-1">' + ad.campaign + "</p>" +
-					'<h3 class="fs-18 mb-2 text-ov">' + ad.adName + "</h3>" +
-					'<span class="fs-13 text-muted">' + ad.datasource + "</span>" +
-					"</div>" +
-					'<div class="d-flex col-md-5 col-sm-6 col-xxl-7 align-items-center justify-content-between">' +
-					'<div class="d-flex mb-4 align-items-center">' +
-					"<div><h3 class=\"fs-20 text-black mb-0\">" + WindsorClient.money(ad.spend) + "</h3>" +
-					'<span class="fs-14">Gasto</span></div>' +
-					"</div>" +
-					'<div class="d-flex mb-4 align-items-center">' +
-					"<div><h3 class=\"fs-20 text-black mb-0\">" + WindsorClient.compact(ad.clicks) + "</h3>" +
-					'<span class="fs-14">' + valueLabel + "</span></div>" +
-					"</div>" +
-					"</div>" +
-					"</div>"
-				);
-			})
-			.join("");
-
-		$container.html(html);
+		$container.empty();
+		ads.forEach(function (ad, i) {
+			var last = i === ads.length - 1;
+			var row = document.createElement("div");
+			row.className = "row mb-4" + (last ? "" : " border-bottom") + " sp10 align-items-center";
+			row.innerHTML =
+				'<div class="mb-4 col-md-7 col-sm-6 col-xxl-5">' +
+				'<p class="text-primary mb-1"></p>' +
+				'<h3 class="fs-18 mb-2 text-ov"></h3>' +
+				'<span class="fs-13 text-muted"></span>' +
+				"</div>" +
+				'<div class="d-flex col-md-5 col-sm-6 col-xxl-7 align-items-center justify-content-between">' +
+				'<div class="d-flex mb-4 align-items-center">' +
+				"<div><h3 class=\"fs-20 text-black mb-0\">" + WindsorClient.money(ad.spend) + "</h3>" +
+				'<span class="fs-14">Gasto</span></div>' +
+				"</div>" +
+				'<div class="d-flex mb-4 align-items-center">' +
+				"<div><h3 class=\"fs-20 text-black mb-0\">" + WindsorClient.compact(ad.clicks) + "</h3>" +
+				'<span class="fs-14 ad-value-label"></span></div>' +
+				"</div>" +
+				"</div>";
+			row.querySelector("p").textContent = ad.campaign;
+			row.querySelector("h3.fs-18").textContent = ad.adName;
+			row.querySelector("span.fs-13").textContent = ad.datasource;
+			row.querySelector(".ad-value-label").textContent = valueLabel;
+			$container.append(row);
+		});
 	}
 
 	function renderKpis(data) {
@@ -322,37 +325,40 @@
 	}
 
 	function loadRealData() {
-		if (typeof WindsorClient === "undefined") return;
+		if (typeof WindsorClient === "undefined" || typeof AuditClient === "undefined") return;
 		setLoading(true);
 
-		WindsorClient.fetchMetrics({ datePreset: currentPreset })
-			.then(function (data) {
-				lastData = data;
-				setLoading(false);
-				renderKpis(data);
-				lineChart("activity", data.clickSummary.labels, data.clickSummary.data, "rgb(82, 177, 65)", "Clics", false);
-				lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(236, 72, 153)", "Gasto", true);
-				renderGoalStatistic(data.objectiveBreakdown, data.ctrGauge);
-				renderPlatformBreakdown(data.plataformas);
-				renderEngagementChart(data.engagementByPlatform);
-				renderAdList("#mostPerformedAdsList", data.topAds.slice(0, 3), "Clics");
-				renderAdList("#trendingAdsList", data.topAds.slice(0, 3).reverse(), "Clics");
-			})
-			.catch(function (err) {
-				setLoading(false);
-				console.error("windsor-metrics:", err);
-				$("#rangeSubtitle").text("No se pudieron cargar los datos de Windsor.ai");
-				var $container = $("#platformBreakdownList");
-				if ($container.length) {
-					$container.html(
-						'<div class="alert alert-danger mb-0">No se pudieron cargar los datos de Windsor.ai' +
+		AuditClient.requireAuth().then(function (session) {
+			if (!session) return null; // ya redirigió a page-login.html
+			return WindsorClient.fetchMetrics({ datePreset: currentPreset });
+		}).then(function (data) {
+			if (!data) return;
+			lastData = data;
+			setLoading(false);
+			renderKpis(data);
+			lineChart("activity", data.clickSummary.labels, data.clickSummary.data, "rgb(82, 177, 65)", "Clics", false);
+			lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(236, 72, 153)", "Gasto", true);
+			renderGoalStatistic(data.objectiveBreakdown, data.ctrGauge);
+			renderPlatformBreakdown(data.plataformas);
+			renderEngagementChart(data.engagementByPlatform);
+			renderAdList("#mostPerformedAdsList", data.topAds.slice(0, 3), "Clics");
+			renderAdList("#trendingAdsList", data.topAds.slice(0, 3).reverse(), "Clics");
+		}).catch(function (err) {
+			setLoading(false);
+			console.error("windsor-metrics:", err);
+			$("#rangeSubtitle").text("No se pudieron cargar los datos de Windsor.ai");
+			var $container = $("#platformBreakdownList");
+			if ($container.length) {
+				$container.empty().append(
+					$("<div>", { class: "alert alert-danger mb-0" }).text(
+						"No se pudieron cargar los datos de Windsor.ai" +
 							(err && err.status ? " (HTTP " + err.status + ")" : "") +
 							": " +
-							(err && err.message ? err.message : "error desconocido") +
-							"</div>"
-					);
-				}
-			});
+							(err && err.message ? err.message : "error desconocido")
+					)
+				);
+			}
+		});
 	}
 
 	jQuery(window).on("load", function () {

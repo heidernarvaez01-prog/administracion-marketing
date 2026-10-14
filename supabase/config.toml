@@ -1,9 +1,11 @@
 project_id = "szdivobcbdkiszgrizic"
 
 [functions.windsor-metrics]
-# Las páginas Eclan (HTML estático) llaman a esta función solo con la
-# apikey pública (anon), sin sesión de usuario logueado.
-verify_jwt = false
+# Antes false: las páginas Eclan llamaban solo con la apikey pública, sin
+# sesión. Ahora exige un JWT real — la función además valida con
+# auth.getUser() y usa ese JWT para que RLS filtre los datos (ver Paso 0
+# de supabase/functions/windsor-metrics/index.ts).
+verify_jwt = true
 
 # --- Portado desde Ad-Audit-Platform (login, auditorías, alertas, IA) ---
 [functions.sync-meta-datos]

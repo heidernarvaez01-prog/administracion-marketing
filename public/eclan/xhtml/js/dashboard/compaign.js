@@ -15,6 +15,10 @@
 	//    plataforma (datasource) de la campaña
 	// ------------------------------------------------------------------
 
+	// Construye la fila con createElement/textContent: c.datasource/c.campaign/
+	// c.lastDate vienen de Meta (vía meta_datos) y nunca deben insertarse como
+	// HTML concatenado — un nombre de campaña con '<' rompería el markup o,
+	// peor, inyectaría HTML/JS.
 	function renderCampaignRow(c) {
 		var statusClass = c.status === "On Going" ? "bgl-primary text-primary" : "bgl-danger text-danger";
 		var donutValue = Math.max(0, Math.min(100, c.ctr * 10)); // CTR real suele ser bajo (<10%); se escala x10 solo para que el donut visual no quede vacío
@@ -24,18 +28,19 @@
 			radius: 10,
 		});
 
-		return (
-			'<div class="compaign-row align-items-center p-sm-4 p-3 row sp16 mx-0 mb-2">' +
+		var row = document.createElement("div");
+		row.className = "compaign-row align-items-center p-sm-4 p-3 row sp16 mx-0 mb-2";
+		row.innerHTML =
 			'<div class="my-2 col-xl-4 col-xxl-6 col-lg-6 col-md-8 col-sm-12">' +
 			'<div class="media align-items-center">' +
 			'<div class="d-inline-block position-relative donut-chart-sale me-4">' +
-			"<span class=\"donut\" data-peity='" + donutPeity + "'>" + donutValue.toFixed(0) + "/100</span>" +
-			"<small>" + c.ctr.toFixed(2) + "% CTR</small>" +
+			"<span class=\"donut\" data-peity='" + donutPeity + "'></span>" +
+			"<small></small>" +
 			"</div>" +
 			'<div class="media-body">' +
-			'<p class="text-primary mb-1">' + c.datasource + "</p>" +
-			'<h3 class="fs-20"><a class="text-black" href="analytics.html">' + c.campaign + "</a></h3>" +
-			'<span class="fs-14 ms-1">Última actividad: ' + c.lastDate + "</span>" +
+			'<p class="text-primary mb-1"></p>' +
+			'<h3 class="fs-20"><a class="text-black" href="analytics.html"></a></h3>' +
+			'<span class="fs-14 ms-1"></span>' +
 			"</div>" +
 			"</div>" +
 			"</div>" +
@@ -49,40 +54,53 @@
 			'<span class="btn btn-outline-dark p-3 text-ov">' + WindsorClient.compact(c.impressions) + " impresiones</span>" +
 			"</div>" +
 			'<div class="col-xl-4 col-xxl-8 col-lg-8 col-md-6 text-start text-md-end my-2">' +
-			'<span class="btn ' + statusClass + ' cl-btn">' + c.status + "</span>" +
-			"</div>" +
-			"</div>"
-		);
+			'<span class="btn ' + statusClass + ' cl-btn"></span>' +
+			"</div>";
+
+		row.querySelector(".donut-chart-sale .donut").textContent = donutValue.toFixed(0) + "/100";
+		row.querySelector(".donut-chart-sale small").textContent = c.ctr.toFixed(2) + "% CTR";
+		row.querySelector(".media-body p").textContent = c.datasource;
+		row.querySelector(".media-body h3 a").textContent = c.campaign;
+		row.querySelector(".media-body > span").textContent = "Última actividad: " + c.lastDate;
+		row.querySelector(".cl-btn").textContent = c.status;
+		return row;
 	}
 
 	function loadCampaigns() {
 		var $container = $("#campaignList");
-		if ($container.length === 0 || typeof WindsorClient === "undefined") return;
+		if ($container.length === 0 || typeof WindsorClient === "undefined" || typeof AuditClient === "undefined") return;
 
-		WindsorClient.fetchMetrics({ datePreset: "last_90d" })
-			.then(function (data) {
-				if (!data.campaigns || !data.campaigns.length) {
-					$container.html('<p class="text-muted p-4 mb-0">No hay campañas en el rango consultado.</p>');
-					return;
-				}
+		AuditClient.requireAuth().then(function (session) {
+			if (!session) return; // ya redirigió a page-login.html
 
-				var html = data.campaigns.map(renderCampaignRow).join("");
-				$container.html(html);
+			WindsorClient.fetchMetrics({ datePreset: "last_90d" })
+				.then(function (data) {
+					if (!data.campaigns || !data.campaigns.length) {
+						$container.empty().append(
+							$("<p>", { class: "text-muted p-4 mb-0", text: "No hay campañas en el rango consultado." })
+						);
+						return;
+					}
 
-				// Peity escanea el DOM al llamarse; hay que reinicializar
-				// después de inyectar los nuevos ".donut".
-				$("#campaignList span.donut").peity("donut", { width: "80", height: "80" });
-			})
-			.catch(function (err) {
-				console.error("windsor-metrics:", err);
-				$container.html(
-					'<div class="alert alert-danger m-3">No se pudieron cargar las campañas de Windsor.ai' +
-						(err && err.status ? " (HTTP " + err.status + ")" : "") +
-						": " +
-						(err && err.message ? err.message : "error desconocido") +
-						"</div>"
-				);
-			});
+					$container.empty();
+					data.campaigns.forEach(function (c) { $container.append(renderCampaignRow(c)); });
+
+					// Peity escanea el DOM al llamarse; hay que reinicializar
+					// después de inyectar los nuevos ".donut".
+					$("#campaignList span.donut").peity("donut", { width: "80", height: "80" });
+				})
+				.catch(function (err) {
+					console.error("windsor-metrics:", err);
+					$container.empty().append(
+						$("<div>", { class: "alert alert-danger m-3" }).text(
+							"No se pudieron cargar las campañas de Windsor.ai" +
+								(err && err.status ? " (HTTP " + err.status + ")" : "") +
+								": " +
+								(err && err.message ? err.message : "error desconocido")
+						)
+					);
+				});
+		});
 	}
 
 	jQuery(window).on("load", function () {

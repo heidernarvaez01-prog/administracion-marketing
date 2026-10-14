@@ -7,6 +7,11 @@
  * VITE_SUPABASE_PUBLISHABLE_KEY). La anon key de Supabase está pensada
  * para ser pública en el cliente; la clave real de Windsor.ai NUNCA pasa
  * por acá, vive solo como secret de la Edge Function.
+ *
+ * windsor-metrics ahora exige sesión real (ver Paso 0 de CLAUDE.md): el
+ * JWT de la sesión de AuditClient va en el header Authorization, no la
+ * anon key fija — sin eso, la función responde 401. Requiere que la
+ * página haya cargado antes supabase-client.js.
  */
 (function (window) {
 	"use strict";
@@ -19,28 +24,40 @@
 		var url = SUPABASE_URL + "/functions/v1/windsor-metrics";
 		var params = [];
 		if (options.datePreset) params.push("date_preset=" + encodeURIComponent(options.datePreset));
+		if (options.clientId) params.push("client_id=" + encodeURIComponent(options.clientId));
+		if (options.accountId) params.push("account_id=" + encodeURIComponent(options.accountId));
 		if (options.raw) params.push("raw=1");
 		if (params.length) url += "?" + params.join("&");
 
-		return fetch(url, {
-			headers: {
-				apikey: SUPABASE_ANON_KEY,
-				Authorization: "Bearer " + SUPABASE_ANON_KEY,
-			},
-		})
-			.then(function (res) {
-				return res.json().then(function (body) {
-					if (!res.ok || body.error) {
-						var err = new Error(
-							(body && body.mensaje) || "windsor-metrics respondió " + res.status
-						);
-						err.status = (body && body.status) || res.status;
-						err.payload = body;
-						throw err;
-					}
-					return body;
-				});
+		var getToken = (typeof AuditClient !== "undefined")
+			? AuditClient.getSession().then(function (session) { return session && session.access_token; })
+			: Promise.resolve(null);
+
+		return getToken.then(function (accessToken) {
+			if (!accessToken) {
+				var authErr = new Error("Sesión requerida.");
+				authErr.status = 401;
+				throw authErr;
+			}
+			return fetch(url, {
+				headers: {
+					apikey: SUPABASE_ANON_KEY,
+					Authorization: "Bearer " + accessToken,
+				},
 			});
+		}).then(function (res) {
+			return res.json().then(function (body) {
+				if (!res.ok || body.error) {
+					var err = new Error(
+						(body && body.mensaje) || "windsor-metrics respondió " + res.status
+					);
+					err.status = (body && body.status) || res.status;
+					err.payload = body;
+					throw err;
+				}
+				return body;
+			});
+		});
 	}
 
 	// Formatters chiquitos reutilizados por analytics.js / compaign.js
