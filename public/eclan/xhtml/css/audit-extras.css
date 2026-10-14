@@ -1,0 +1,74 @@
+/* Estilos compartidos del módulo de auditoría (clientes.html + auditoria.html)
+   que no vienen en el template Eclan base. No toca el sidebar/menú. */
+
+/* Fila de mini status-dots con conteo, debajo de las mini-stats de cada tarjeta */
+.status-dot-row { font-size: 11px; }
+.status-dot-row .dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	margin-right: 4px;
+}
+
+/* Tabla de auditoría: edición inline sin el aspecto de "input roto" */
+.audit-table input.inline-edit,
+.audit-table select.inline-edit {
+	min-width: 110px;
+	font-size: 12px;
+}
+
+/* Fila expandible clickeable */
+tr.audit-row { cursor: pointer; }
+tr.audit-row:hover { background: rgba(0, 0, 0, 0.02); }
+tr.audit-row td:first-child i.audit-chevron { transition: transform 0.2s ease; }
+tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: rotate(90deg); }
+
+.audit-expanded-panel {
+	padding: 16px;
+}
+.audit-expanded-panel .apexcharts-canvas { margin: 0 auto; }
+
+/* "Clientes y Agencias" (admin.html): chip con botón de quitar, igual de forma
+   en managers/viewers/cuentas. */
+.ca-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	background: #f6f6f6;
+	border-radius: 999px;
+	padding: 3px 6px 3px 10px;
+	margin: 2px 4px 2px 0;
+}
+.ca-chip .ca-chip-remove {
+	all: unset;
+	cursor: pointer;
+	color: #ea4d4d;
+	display: inline-flex;
+	align-items: center;
+	padding: 2px;
+	border-radius: 50%;
+}
+.ca-chip .ca-chip-remove:hover { background: rgba(234, 77, 77, 0.12); }
+
+.ca-agency-card { border-left: 3px solid var(--bs-primary, #3AAFA9); }
+.ca-client-card { background: #fafafa; }
+.ca-cross-warning {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+	background: #fdf3e2;
+	border: 1px solid #eccd94;
+	color: #a8721f;
+	border-radius: 6px;
+	padding: 6px 10px;
+	font-size: 12px;
+}
+.ca-account-row input.ca-currency {
+	width: 56px;
+	text-align: center;
+	text-transform: uppercase;
+	font-family: monospace;
+}

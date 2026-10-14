@@ -28,6 +28,7 @@
 	<link rel="stylesheet" href="vendor/chartist/css/chartist.min.css">
     <link href="vendor/bootstrap-select/dist/css/bootstrap-select.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
+    <link href="css/audit-extras.css" rel="stylesheet">
 	<link href="https://cdn.lineicons.com/2.0/LineIcons.css" rel="stylesheet">
 
 </head>
@@ -1004,6 +1005,14 @@
 				</div>
 
 				<div id="adminContent" class="d-none">
+
+					<ul class="nav nav-tabs mt-2" role="tablist">
+						<li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabEquipo">Equipo</a></li>
+						<li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabClientesAgencias">Clientes y Agencias</a></li>
+					</ul>
+					<div class="tab-content pt-3">
+
+					<div class="tab-pane fade show active" id="tabEquipo">
 					<!-- Stat tiles -->
 					<div class="row mb-3" id="adminStats"></div>
 
@@ -1043,12 +1052,76 @@
 							</table>
 						</div>
 					</div>
+					</div>
+
+					<div class="tab-pane fade" id="tabClientesAgencias">
+						<div id="clientsAgenciesLoading" class="text-center py-5">
+							<div class="spinner-border text-primary" role="status"></div>
+						</div>
+						<div id="clientsAgenciesContent" class="d-none">
+							<div class="row mb-3" id="caStats"></div>
+							<div id="caFormError" class="alert alert-danger py-2 px-3 d-none"></div>
+							<div id="caAgencies"></div>
+						</div>
+					</div>
+
+					</div>
 				</div>
 			</div>
         </div>
         <!--**********************************
             Content body end (admin)
         ***********************************-->
+
+        <!-- Modal: nuevo cliente -->
+        <div class="modal fade" id="newClientModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Nuevo cliente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="newClientFormError" class="alert alert-danger py-2 px-3 d-none"></div>
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="newClientName">Nombre del cliente / marca</label>
+                            <input type="text" class="form-control" id="newClientName" maxlength="120" placeholder="ej. Acme Corp">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="newClientDescription">Descripción (opcional)</label>
+                            <input type="text" class="form-control" id="newClientDescription" maxlength="200" placeholder="ej. E-commerce — Meta + Google">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label class="form-label" for="newClientAgency">Agencia</label>
+                            <select class="form-control" id="newClientAgency"></select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="newClientSubmitBtn">Crear cliente</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal genérico de confirmación (adjuntar cuenta cruzada / añadir manager / añadir viewer / quitar cuenta) -->
+        <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="confirmActionTitle"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0" id="confirmActionBody"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="confirmActionBtn">Confirmar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!--**********************************
             Footer start
         ***********************************-->
@@ -1088,6 +1161,7 @@
 	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 	<script src="js/dashboard/supabase-client.js"></script>
 	<script src="js/dashboard/admin.js"></script>
+	<script src="js/dashboard/admin-clientes.js"></script>
 
 </body>
 </html>
