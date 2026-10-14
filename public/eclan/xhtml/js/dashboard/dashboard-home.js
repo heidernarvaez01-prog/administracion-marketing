@@ -182,15 +182,25 @@
 
 			var body = document.createElement("div");
 			body.className = "media-body";
+			// .media-body de este tema no trae min-width:0 — sin esto, el
+			// ellipsis de .text-ov no se puede aplicar y el nombre largo de
+			// una campaña real empuja el gasto fuera de la tarjeta.
+			body.style.minWidth = "0";
 
 			var top1 = document.createElement("div");
 			top1.className = "d-flex justify-content-between";
 			var name = document.createElement("span");
 			name.className = "text-black font-w600 text-ov";
-			name.style.maxWidth = "70%";
+			// flex-shrink real: sin min-width:0 un hijo flex no se achica por
+			// debajo de su contenido aunque tenga max-width + ellipsis, y el
+			// nombre de campaña (dato real, puede ser largo) empuja el gasto
+			// fuera de la tarjeta.
+			name.style.minWidth = "0";
+			name.style.flex = "1 1 auto";
 			name.textContent = c.campaign;
 			var spend = document.createElement("small");
-			spend.className = "text-muted";
+			spend.className = "text-muted ms-2";
+			spend.style.flex = "0 0 auto";
 			spend.textContent = WindsorClient.money(c.spend, currency);
 			top1.appendChild(name);
 			top1.appendChild(spend);
