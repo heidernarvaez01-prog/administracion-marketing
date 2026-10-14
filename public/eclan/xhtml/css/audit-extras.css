@@ -91,3 +91,19 @@ tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: r
 .chatbox {
 	display: none !important;
 }
+
+/* Paso 3: páginas de plantilla sin relación con marketing — ocultas para
+   TODOS, no es "por rol": es contenido muerto de la plantilla que no le
+   sirve a nadie en Apache 360 (igual de permanente que el bloque de arriba). */
+[data-demo-menu] {
+	display: none !important;
+}
+
+/* "Administración" sí es real, pero solo para admin — esto sí es por rol
+   (cosmético, la seguridad real es RLS). Oculto por default hasta que
+   role-ui.js confirme el rol, para que no haya parpadeo mostrándolo un
+   instante a cualquiera; role-ui.js quita el atributo data-require-role
+   cuando corresponde, revirtiendo al display normal del menú. */
+[data-require-role] {
+	display: none;
+}

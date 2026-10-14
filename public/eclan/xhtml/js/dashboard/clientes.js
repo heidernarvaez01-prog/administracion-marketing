@@ -14,6 +14,7 @@
 	var $alertBanner = $("#clientsAlertBanner");
 	var allClients = [];
 	var statsByClient = {};
+	var isAdmin = false;
 
 	var $clientModal = $("#clientModal");
 	var clientModalEl = document.getElementById("clientModal");
@@ -121,13 +122,18 @@
 				'<h5 class="mb-1 text-ov">' + escapeHtml(c.name) + "</h5>" +
 				desc +
 				"</div>" +
-				'<div class="dropdown ms-2">' +
-				'<a href="javascript:;" data-bs-toggle="dropdown"><i class="fa fa-ellipsis-v"></i></a>' +
-				'<div class="dropdown-menu dropdown-menu-end">' +
-				'<a href="javascript:;" class="dropdown-item edit-client-btn" data-id="' + c.id + '" data-name="' + escapeHtml(c.name) + '" data-description="' + escapeHtml(c.description || "") + '"><i class="fa fa-pencil me-2"></i>Editar</a>' +
-				'<a href="javascript:;" class="dropdown-item text-danger delete-client-btn" data-id="' + c.id + '" data-name="' + escapeHtml(c.name) + '"><i class="fa fa-trash me-2"></i>Eliminar</a>' +
-				"</div>" +
-				"</div>" +
+				// El menú "⋮" (editar/eliminar cliente) es solo para admin —
+				// client_accounts/client_members ya no se tocan desde esta
+				// pantalla, se gestionan en "Clientes y Agencias".
+				(isAdmin
+					? '<div class="dropdown ms-2">' +
+					'<a href="javascript:;" data-bs-toggle="dropdown"><i class="fa fa-ellipsis-v"></i></a>' +
+					'<div class="dropdown-menu dropdown-menu-end">' +
+					'<a href="javascript:;" class="dropdown-item edit-client-btn" data-id="' + c.id + '" data-name="' + escapeHtml(c.name) + '" data-description="' + escapeHtml(c.description || "") + '"><i class="fa fa-pencil me-2"></i>Editar</a>' +
+					'<a href="javascript:;" class="dropdown-item text-danger delete-client-btn" data-id="' + c.id + '" data-name="' + escapeHtml(c.name) + '"><i class="fa fa-trash me-2"></i>Eliminar</a>' +
+					"</div>" +
+					"</div>"
+					: "") +
 				"</div>" +
 				'<div class="row text-center mt-4 mb-1">' +
 				'<div class="col-4 border-end">' +
@@ -312,6 +318,12 @@
 			window.location.replace("page-login.html");
 			return;
 		}
-		loadClients();
+		// isAdmin decide, antes de pintar nada, si cada tarjeta lleva el menú
+		// "⋮" (editar/eliminar) — role-ui.js no alcanza a tiempo el contenido
+		// que esta página todavía no ha renderizado.
+		AuditClient.getCurrentIdentity().then(function (identity) {
+			isAdmin = !!(identity && identity.role === "admin");
+			loadClients();
+		});
 	});
 })(jQuery);
