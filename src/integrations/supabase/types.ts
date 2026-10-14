@@ -54,6 +54,7 @@ export type Database = {
           currency: string | null
           last_data_date: string | null
           last_probe_at: string | null
+          last_synced_at: string | null
           managed_by: string
           platform: string
           sync_mode: string
@@ -67,6 +68,7 @@ export type Database = {
           currency?: string | null
           last_data_date?: string | null
           last_probe_at?: string | null
+          last_synced_at?: string | null
           managed_by?: string
           platform?: string
           sync_mode?: string
@@ -80,6 +82,7 @@ export type Database = {
           currency?: string | null
           last_data_date?: string | null
           last_probe_at?: string | null
+          last_synced_at?: string | null
           managed_by?: string
           platform?: string
           sync_mode?: string
@@ -612,7 +615,9 @@ export type Database = {
           interactions: number | null
           landing_page_views: number | null
           lead_value: number | null
+          leads: number | null
           link_clicks: number | null
+          messaging_conversations: number | null
           objective: string | null
           optimization_goal: string | null
           plataforma: string
@@ -665,7 +670,9 @@ export type Database = {
           interactions?: number | null
           landing_page_views?: number | null
           lead_value?: number | null
+          leads?: number | null
           link_clicks?: number | null
+          messaging_conversations?: number | null
           objective?: string | null
           optimization_goal?: string | null
           plataforma?: string
@@ -718,7 +725,9 @@ export type Database = {
           interactions?: number | null
           landing_page_views?: number | null
           lead_value?: number | null
+          leads?: number | null
           link_clicks?: number | null
+          messaging_conversations?: number | null
           objective?: string | null
           optimization_goal?: string | null
           plataforma?: string
@@ -983,6 +992,8 @@ export type Database = {
           currency: string | null
           fecha: string | null
           impressions: number | null
+          leads: number | null
+          messaging_conversations: number | null
           spend: number | null
         }
         Relationships: [
@@ -1006,6 +1017,8 @@ export type Database = {
           currency: string
           impressions: number
           last_fecha: string
+          leads: number
+          messaging_conversations: number
           spend: number
         }[]
       }
@@ -1035,6 +1048,8 @@ export type Database = {
           first_fecha: string
           impressions: number
           last_fecha: string
+          leads: number
+          messaging_conversations: number
           spend: number
         }[]
       }
@@ -1045,6 +1060,8 @@ export type Database = {
           currency: string
           fecha: string
           impressions: number
+          leads: number
+          messaging_conversations: number
           spend: number
         }[]
       }
