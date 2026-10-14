@@ -11,6 +11,7 @@
 	var $authRequired = $("#authRequired");
 
 	var $summary = $("#clientsSummary");
+	var $alertBanner = $("#clientsAlertBanner");
 	var allClients = [];
 	var statsByClient = {};
 
@@ -56,16 +57,45 @@
 	}
 
 	function renderSummary(clients) {
-		var campaigns = 0, budget = 0;
+		var campaigns = 0, budget = 0, spent = 0, atRisk = 0, criticalAlerts = 0;
 		clients.forEach(function (c) {
-			var s = statsByClient[c.id] || { campaigns: 0, budget: 0 };
+			var s = statsByClient[c.id] || { campaigns: 0, budget: 0, spent: 0, atRisk: 0, criticalAlerts: 0 };
 			campaigns += s.campaigns;
 			budget += s.budget;
+			spent += s.spent;
+			if (s.atRisk > 0) atRisk += 1; // clientes (no campañas) fuera de ritmo
+			criticalAlerts += s.criticalAlerts;
 		});
 		$("#sumClients").text(clients.length);
 		$("#sumCampaigns").text(campaigns);
 		$("#sumBudget").text(money(budget));
+		$("#sumSpent").text(money(spent));
+		$("#sumAtRisk").text(atRisk);
+		$("#sumAtRiskIcon").toggleClass("bg-success", atRisk === 0).toggleClass("bg-warning", atRisk > 0);
 		$summary.removeClass("d-none");
+		renderAlertBanner(criticalAlerts);
+	}
+
+	function renderAlertBanner(criticalAlerts) {
+		if (!criticalAlerts) {
+			$alertBanner.addClass("d-none");
+			return;
+		}
+		$("#clientsAlertBannerText").text(
+			criticalAlerts + (criticalAlerts === 1 ? " alerta crítica requiere" : " alertas críticas requieren") + " atención"
+		);
+		$alertBanner.removeClass("d-none");
+	}
+
+	function statusDots(stats) {
+		var parts = [];
+		if (stats.ok) parts.push('<span class="dot" style="background:#17c666;"></span>' + stats.ok + " en ritmo");
+		if (stats.under) parts.push('<span class="dot" style="background:#f3b023;"></span>' + stats.under + " subgastando");
+		if (stats.over) parts.push('<span class="dot" style="background:#ea4d4d;"></span>' + stats.over + " sobregastando");
+		if (!parts.length) return "";
+		return '<div class="status-dot-row text-muted d-flex flex-wrap gap-2 mt-2">' +
+			parts.map(function (p) { return '<span class="d-inline-flex align-items-center">' + p + "</span>"; }).join("") +
+			"</div>";
 	}
 
 	function renderClients(clients) {
@@ -75,7 +105,7 @@
 		}
 		var html = clients.map(function (c, idx) {
 			var accent = ACCENTS[idx % ACCENTS.length];
-			var stats = statsByClient[c.id] || { campaigns: 0, budget: 0, last: null };
+			var stats = statsByClient[c.id] || { campaigns: 0, budget: 0, spent: 0, last: null, ok: 0, under: 0, over: 0 };
 			var desc = c.description
 				? '<p class="text-muted fs-13 mb-0 text-ov">' + escapeHtml(c.description) + "</p>"
 				: '<p class="text-muted fs-13 mb-0 fst-italic">Sin descripción</p>';
@@ -100,15 +130,20 @@
 				"</div>" +
 				"</div>" +
 				'<div class="row text-center mt-4 mb-1">' +
-				'<div class="col-6 border-end">' +
-				'<h4 class="mb-0 font-w600">' + stats.campaigns + "</h4>" +
+				'<div class="col-4 border-end">' +
+				'<h5 class="mb-0 font-w600">' + stats.campaigns + "</h5>" +
 				'<span class="fs-12 text-muted">Campañas</span>' +
 				"</div>" +
-				'<div class="col-6">' +
-				'<h4 class="mb-0 font-w600">' + money(stats.budget) + "</h4>" +
+				'<div class="col-4 border-end">' +
+				'<h5 class="mb-0 font-w600">' + money(stats.budget) + "</h5>" +
 				'<span class="fs-12 text-muted">Presupuesto</span>' +
 				"</div>" +
+				'<div class="col-4">' +
+				'<h5 class="mb-0 font-w600">' + money(stats.spent) + "</h5>" +
+				'<span class="fs-12 text-muted">Gasto</span>' +
 				"</div>" +
+				"</div>" +
+				statusDots(stats) +
 				'<p class="fs-12 text-muted text-center mt-2 mb-0">Última auditoría: ' + fmtDate(stats.last) + "</p>" +
 				'<a href="auditoria.html?client_id=' + c.id + '" class="btn btn-outline-primary btn-sm w-100 mt-3">Abrir auditoría <i class="fa fa-arrow-right ms-1"></i></a>' +
 				"</div>" +
@@ -133,22 +168,42 @@
 		renderClients(filtered);
 	}
 
+	// Igual que auditoria.js: trae el gasto real vía windsor-metrics y corre
+	// el mismo motor de pacing (AuditLib.buildAuditRows) para que "Gasto
+	// total", "En riesgo" y el banner de alertas usen el mismo cálculo que
+	// la tabla de auditoría por cliente, no sólo el presupuesto configurado.
 	function loadStats(clients) {
 		statsByClient = {};
 		if (!clients.length) return Promise.resolve();
-		return supabase
-			.from("audit_records")
-			.select("client_id,presupuesto_total,updated_at")
-			.then(function (res) {
-				(res.data || []).forEach(function (r) {
-					if (!r.client_id) return;
-					var s = statsByClient[r.client_id] || { campaigns: 0, budget: 0, last: null };
-					s.campaigns += 1;
-					s.budget += Number(r.presupuesto_total || 0);
-					if (!s.last || (r.updated_at && r.updated_at > s.last)) s.last = r.updated_at;
-					statsByClient[r.client_id] = s;
-				});
+
+		var windsor = (typeof WindsorClient !== "undefined")
+			? WindsorClient.fetchMetrics({ raw: true }).catch(function () { return { dailyCampaignTotals: [] }; })
+			: Promise.resolve({ dailyCampaignTotals: [] });
+
+		return Promise.all([
+			supabase.from("audit_records").select("id,client_id,campaign_name,presupuesto_total,fecha_inicio,fecha_fin,tipo_calendario,updated_at"),
+			windsor,
+		]).then(function (results) {
+			var records = (results[0] && results[0].data) || [];
+			var dailyCampaignTotals = (results[1] && results[1].dailyCampaignTotals) || [];
+			var rows = (typeof AuditLib !== "undefined")
+				? AuditLib.buildAuditRows(records, dailyCampaignTotals)
+				: records.map(function (r) { return Object.assign({}, r, { metrics: { gastoActual: 0, pacingStatus: "OK" }, alerts: [] }); });
+
+			rows.forEach(function (r) {
+				if (!r.client_id) return;
+				var s = statsByClient[r.client_id] || { campaigns: 0, budget: 0, spent: 0, last: null, ok: 0, under: 0, over: 0, atRisk: 0, criticalAlerts: 0 };
+				s.campaigns += 1;
+				s.budget += Number(r.presupuesto_total || 0);
+				s.spent += r.metrics.gastoActual;
+				if (!s.last || (r.updated_at && r.updated_at > s.last)) s.last = r.updated_at;
+				if (r.metrics.pacingStatus === "OK") s.ok += 1;
+				else if (r.metrics.pacingStatus === "SUBGASTANDO") { s.under += 1; s.atRisk += 1; }
+				else { s.over += 1; s.atRisk += 1; }
+				s.criticalAlerts += r.alerts.filter(function (a) { return a.severity === "danger"; }).length;
+				statsByClient[r.client_id] = s;
 			});
+		});
 	}
 
 	function loadClients() {
