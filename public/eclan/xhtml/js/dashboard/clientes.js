@@ -11,9 +11,7 @@
 	var $authRequired = $("#authRequired");
 
 	var $summary = $("#clientsSummary");
-	var $alertBanner = $("#clientsAlertBanner");
 	var allClients = [];
-	var statsByClient = {};
 	var isAdmin = false;
 	// Paso 4: datos reales de Meta por cliente, vía client_period_totals.
 	// metaStatsByClient[clientId][7|30] = [{currency, spend, impressions,
@@ -54,11 +52,6 @@
 
 	var ACCENTS = ["bg-primary", "bg-info", "bg-success", "bg-secondary", "bg-warning", "bg-danger"];
 
-	function money(n) {
-		var v = Number(n || 0);
-		return "$" + v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
-	}
-
 	// "hace X h" / "hace X días" — null si no hay fecha (caller decide el estado vacío).
 	function timeAgo(iso) {
 		if (!iso) return null;
@@ -75,35 +68,40 @@
 		return Number(n || 0).toLocaleString("es-CO");
 	}
 
+	// Resumen de arriba: datos reales de Meta (client_period_totals, ya en
+	// memoria vía metaStatsByClient — respeta el toggle 7/30 días, nunca
+	// vuelve a pedir nada). Gasto nunca se suma entre monedas (una línea
+	// por moneda); leads/conversaciones sí, porque no son dinero. Filas
+	// con client_id nulo (cuenta sin cliente asignado) se descartan.
 	function renderSummary(clients) {
-		var campaigns = 0, budget = 0, spent = 0, atRisk = 0, criticalAlerts = 0;
-		clients.forEach(function (c) {
-			var s = statsByClient[c.id] || { campaigns: 0, budget: 0, spent: 0, atRisk: 0, criticalAlerts: 0 };
-			campaigns += s.campaigns;
-			budget += s.budget;
-			spent += s.spent;
-			if (s.atRisk > 0) atRisk += 1; // clientes (no campañas) fuera de ritmo
-			criticalAlerts += s.criticalAlerts;
-		});
-		$("#sumClients").text(clients.length);
-		$("#sumCampaigns").text(campaigns);
-		$("#sumBudget").text(money(budget));
-		$("#sumSpent").text(money(spent));
-		$("#sumAtRisk").text(atRisk);
-		$("#sumAtRiskIcon").toggleClass("bg-success", atRisk === 0).toggleClass("bg-warning", atRisk > 0);
-		$summary.removeClass("d-none");
-		renderAlertBanner(criticalAlerts);
-	}
+		var spendByCurrency = {};
+		var leads = 0, conversations = 0, hasLeads = false, hasConv = false;
 
-	function renderAlertBanner(criticalAlerts) {
-		if (!criticalAlerts) {
-			$alertBanner.addClass("d-none");
-			return;
+		clients.forEach(function (c) {
+			var rows = (metaStatsByClient[c.id] && metaStatsByClient[c.id][currentWindow]) || [];
+			rows.forEach(function (row) {
+				if (!row.client_id) return;
+				if (row.currency) spendByCurrency[row.currency] = (spendByCurrency[row.currency] || 0) + Number(row.spend || 0);
+				if (row.leads != null) { leads += Number(row.leads); hasLeads = true; }
+				if (row.messaging_conversations != null) { conversations += Number(row.messaging_conversations); hasConv = true; }
+			});
+		});
+
+		$("#sumClients").text(clients.length);
+
+		var $spend = $("#sumSpendByCurrency").empty();
+		var currencies = Object.keys(spendByCurrency);
+		if (!currencies.length) {
+			$spend.append($("<h3>", { class: "mb-0 font-w600", text: "—" }));
+		} else {
+			currencies.sort().forEach(function (cur) {
+				$spend.append($("<h3>", { class: "mb-0 font-w600 fs-20", text: cur + " " + fmtCount(spendByCurrency[cur]) }));
+			});
 		}
-		$("#clientsAlertBannerText").text(
-			criticalAlerts + (criticalAlerts === 1 ? " alerta crítica requiere" : " alertas críticas requieren") + " atención"
-		);
-		$alertBanner.removeClass("d-none");
+
+		$("#sumLeads").text(hasLeads ? fmtCount(leads) : "—");
+		$("#sumConversations").text(hasConv ? fmtCount(conversations) : "—");
+		$summary.removeClass("d-none");
 	}
 
 	function renderClients(clients) {
@@ -232,44 +230,6 @@
 		renderClients(filtered);
 	}
 
-	// Igual que auditoria.js: trae el gasto real vía windsor-metrics y corre
-	// el mismo motor de pacing (AuditLib.buildAuditRows) para que "Gasto
-	// total", "En riesgo" y el banner de alertas usen el mismo cálculo que
-	// la tabla de auditoría por cliente, no sólo el presupuesto configurado.
-	function loadStats(clients) {
-		statsByClient = {};
-		if (!clients.length) return Promise.resolve();
-
-		var windsor = (typeof WindsorClient !== "undefined")
-			? WindsorClient.fetchMetrics({ raw: true }).catch(function () { return { dailyCampaignTotals: [] }; })
-			: Promise.resolve({ dailyCampaignTotals: [] });
-
-		return Promise.all([
-			supabase.from("audit_records").select("id,client_id,campaign_name,presupuesto_total,fecha_inicio,fecha_fin,tipo_calendario,updated_at"),
-			windsor,
-		]).then(function (results) {
-			var records = (results[0] && results[0].data) || [];
-			var dailyCampaignTotals = (results[1] && results[1].dailyCampaignTotals) || [];
-			var rows = (typeof AuditLib !== "undefined")
-				? AuditLib.buildAuditRows(records, dailyCampaignTotals)
-				: records.map(function (r) { return Object.assign({}, r, { metrics: { gastoActual: 0, pacingStatus: "OK" }, alerts: [] }); });
-
-			rows.forEach(function (r) {
-				if (!r.client_id) return;
-				var s = statsByClient[r.client_id] || { campaigns: 0, budget: 0, spent: 0, last: null, ok: 0, under: 0, over: 0, atRisk: 0, criticalAlerts: 0 };
-				s.campaigns += 1;
-				s.budget += Number(r.presupuesto_total || 0);
-				s.spent += r.metrics.gastoActual;
-				if (!s.last || (r.updated_at && r.updated_at > s.last)) s.last = r.updated_at;
-				if (r.metrics.pacingStatus === "OK") s.ok += 1;
-				else if (r.metrics.pacingStatus === "SUBGASTANDO") { s.under += 1; s.atRisk += 1; }
-				else { s.over += 1; s.atRisk += 1; }
-				s.criticalAlerts += r.alerts.filter(function (a) { return a.severity === "danger"; }).length;
-				statsByClient[r.client_id] = s;
-			});
-		});
-	}
-
 	// Paso 4: gasto/impresiones/clics/leads/conversaciones reales de Meta,
 	// por cliente y por moneda, vía client_period_totals (agregado en SQL,
 	// nunca sumando filas de meta_datos en el navegador). Los 2 rangos (7 y
@@ -335,7 +295,7 @@
 					return;
 				}
 				allClients = res.data || [];
-				return Promise.all([loadStats(allClients), loadMetaStats(allClients)]).then(function () {
+				return loadMetaStats(allClients).then(function () {
 					renderSummary(allClients);
 					applyFilter();
 				});
@@ -417,11 +377,13 @@
 		AuditClient.signOut();
 	});
 	// Los 2 rangos ya están en memoria (loadMetaStats pidió 7 y 30 juntos) —
-	// cambiar la ventana solo re-pinta, nunca vuelve a llamar al RPC.
+	// cambiar la ventana solo re-pinta (tarjetas + resumen de arriba),
+	// nunca vuelve a llamar al RPC.
 	$("#clientsWindowToggle").on("click", ".window-btn", function () {
 		currentWindow = Number($(this).data("days"));
 		$("#clientsWindowToggle .window-btn").removeClass("active");
 		$(this).addClass("active");
+		renderSummary(allClients);
 		applyFilter();
 	});
 

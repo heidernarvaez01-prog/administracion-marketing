@@ -1010,14 +1010,9 @@
 					</div>
 				</div>
 
-				<!-- Banner de alertas críticas -->
-				<div id="clientsAlertBanner" class="alert alert-danger d-flex align-items-center flex-wrap gap-2 d-none" role="alert">
-					<i class="fa fa-exclamation-circle me-2"></i>
-					<span id="clientsAlertBannerText" class="me-auto"></span>
-					<a href="alertas.html" class="alert-link">Ver alertas <i class="fa fa-arrow-right ms-1"></i></a>
-				</div>
-
-				<!-- Resumen + buscador -->
+				<!-- Resumen + buscador: datos reales de Meta (client_period_totals),
+				     respeta el toggle 7/30 días de más abajo. Gasto nunca se suma
+				     entre monedas (una línea por moneda); leads/conversaciones sí. -->
 				<div id="clientsSummary" class="row d-none">
 					<div class="col-xl-2 col-lg-4 col-sm-6">
 						<div class="card">
@@ -1030,24 +1025,13 @@
 							</div>
 						</div>
 					</div>
-					<div class="col-xl-2 col-lg-4 col-sm-6">
-						<div class="card">
-							<div class="card-body d-flex align-items-center">
-								<span class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-bullhorn"></i></span>
-								<div>
-									<h3 class="mb-0 font-w600" id="sumCampaigns">0</h3>
-									<span class="fs-13 text-muted">Campañas auditadas</span>
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="col-xl-2 col-lg-4 col-sm-6">
+					<div class="col-xl-3 col-lg-6 col-sm-6">
 						<div class="card">
 							<div class="card-body d-flex align-items-center">
 								<span class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-money"></i></span>
-								<div>
-									<h3 class="mb-0 font-w600" id="sumBudget">$0</h3>
-									<span class="fs-13 text-muted">Presupuesto total</span>
+								<div class="flex-grow-1 min-w-0">
+									<div id="sumSpendByCurrency"><h3 class="mb-0 font-w600">—</h3></div>
+									<span class="fs-13 text-muted">Gasto</span>
 								</div>
 							</div>
 						</div>
@@ -1055,10 +1039,10 @@
 					<div class="col-xl-2 col-lg-4 col-sm-6">
 						<div class="card">
 							<div class="card-body d-flex align-items-center">
-								<span class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-line-chart"></i></span>
+								<span class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-user-plus"></i></span>
 								<div>
-									<h3 class="mb-0 font-w600" id="sumSpent">$0</h3>
-									<span class="fs-13 text-muted">Gasto total</span>
+									<h3 class="mb-0 font-w600" id="sumLeads">—</h3>
+									<span class="fs-13 text-muted">Leads</span>
 								</div>
 							</div>
 						</div>
@@ -1066,15 +1050,15 @@
 					<div class="col-xl-2 col-lg-4 col-sm-6">
 						<div class="card">
 							<div class="card-body d-flex align-items-center">
-								<span id="sumAtRiskIcon" class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-exclamation-triangle"></i></span>
+								<span class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width:48px;height:48px;flex:none;"><i class="fa fa-comments"></i></span>
 								<div>
-									<h3 class="mb-0 font-w600" id="sumAtRisk">0</h3>
-									<span class="fs-13 text-muted">En riesgo</span>
+									<h3 class="mb-0 font-w600" id="sumConversations">—</h3>
+									<span class="fs-13 text-muted" title="Conversaciones nuevas tras 7 días de inactividad">Conversaciones</span>
 								</div>
 							</div>
 						</div>
 					</div>
-					<div class="col-xl-2 col-lg-4 col-sm-6">
+					<div class="col-xl-3 col-lg-4 col-sm-6">
 						<div class="card">
 							<div class="card-body">
 								<input type="text" class="form-control" id="clientSearch" placeholder="Buscar cliente...">
@@ -1204,8 +1188,6 @@
 	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 	<script src="js/dashboard/supabase-client.js"></script>
 	<script src="js/dashboard/role-ui.js"></script>
-	<script src="js/dashboard/windsor-client.js"></script>
-	<script src="js/dashboard/audit-lib.js"></script>
 	<script src="js/dashboard/clientes.js"></script>
 
 </body>
