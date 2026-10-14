@@ -21,6 +21,9 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.send-transactional-email]
+# verify_jwt=true solo exige QUE exista un JWT (la anon key también lo es).
+# El candado real está adentro: admin o x-email-secret para destinatario
+# libre; sin ninguno, solo se manda si la plantilla tiene `to` fijo.
 verify_jwt = true
 
 [functions.audit-insight]

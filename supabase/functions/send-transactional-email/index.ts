@@ -25,9 +25,19 @@ function generateToken(): string {
     .join('')
 }
 
-// Auth note: this function uses verify_jwt = true in config.toml, so Supabase's
-// gateway validates the caller's JWT (anon or service_role) before the request
-// reaches this code. No in-function auth check is needed.
+// Auth: verify_jwt = true en config.toml solo exige QUE exista un JWT — la
+// anon key pública es, en sí misma, un JWT válido, así que antes cualquiera
+// podía mandar cualquier plantilla a cualquier destinatario. Ahora: sesión
+// de admin O el secreto compartido x-email-secret autorizan destinatario
+// libre (recipientEmail del body); sin ninguno de los dos, ese campo se
+// ignora y solo se manda si la plantilla tiene `to` fijo del lado servidor.
+function safeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder()
+  const x = enc.encode(a), y = enc.encode(b)
+  let diff = x.length ^ y.length
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0)
+  return diff === 0
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -37,8 +47,9 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
     console.error('Missing required environment variables')
     return new Response(
       JSON.stringify({ error: 'Server configuration error' }),
@@ -47,6 +58,24 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
+  }
+
+  const expectedSecret = Deno.env.get('EMAIL_DISPATCH_SECRET') ?? ''
+  const providedSecret = req.headers.get('x-email-secret') ?? ''
+  let trustedCaller = !!expectedSecret && safeEqual(providedSecret, expectedSecret)
+
+  if (!trustedCaller) {
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+    })
+    const { data: userData } = await authClient.auth.getUser()
+    if (userData?.user) {
+      const { data: isAdmin } = await authClient.rpc('has_role', {
+        _user_id: userData.user.id,
+        _role: 'admin',
+      })
+      trustedCaller = !!isAdmin
+    }
   }
 
   // Parse request body
@@ -103,15 +132,20 @@ Deno.serve(async (req) => {
   // Resolve effective recipient: template-level `to` takes precedence over
   // the caller-provided recipientEmail. This allows notification templates
   // to always send to a fixed address (e.g., site owner from env var).
-  const effectiveRecipient = template.to || recipientEmail
+  // recipientEmail del body solo se honra si el caller es admin o trae el
+  // secreto compartido — de lo contrario cualquiera con la anon key podría
+  // mandar cualquier plantilla a cualquier destinatario.
+  const effectiveRecipient = template.to || (trustedCaller ? recipientEmail : undefined)
 
   if (!effectiveRecipient) {
     return new Response(
       JSON.stringify({
-        error: 'recipientEmail is required (unless the template defines a fixed recipient)',
+        error: recipientEmail
+          ? 'recipientEmail requires admin session or x-email-secret (unless the template defines a fixed recipient)'
+          : 'recipientEmail is required (unless the template defines a fixed recipient)',
       }),
       {
-        status: 400,
+        status: recipientEmail ? 403 : 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
