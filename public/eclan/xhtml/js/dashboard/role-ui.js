@@ -11,6 +11,13 @@
  * plantilla sin relación con marketing (data-demo-menu) NO dependen de este
  * archivo — se ocultan siempre por CSS en audit-extras.css, para todos,
  * sin importar el rol.
+ *
+ * `<body data-page-access="admin">` marca una página completa como solo
+ * admin (Administración, Alertas, Brief, Clusters, Reporte semanal,
+ * Preguntar a la IA, Calendario, Auditoría de monitoreo, Seleccionar
+ * cliente): si quien entra no es admin, se le redirige a index.html. Es
+ * cosmético igual que lo demás — quien llegue igual por otra vía no ve
+ * datos ajenos porque RLS ya se lo impide en la base.
  */
 (function ($) {
 	"use strict";
@@ -24,6 +31,12 @@
 		var $role = $("#headerUserRole");
 		if ($name.length) $name.text(identity.email || "");
 		if ($role.length) $role.text(identity.label || "");
+
+		var requiredRole = document.body.getAttribute("data-page-access");
+		if (requiredRole && identity.role !== requiredRole) {
+			window.location.replace("index.html");
+			return;
+		}
 
 		if (identity.role === "admin") {
 			// audit-extras.css oculta [data-require-role] por default (evita
