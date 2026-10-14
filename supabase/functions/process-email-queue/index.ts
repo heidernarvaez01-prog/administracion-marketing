@@ -157,12 +157,11 @@ Deno.serve(async (req) => {
     const messageIds = Array.from(
       new Set(
         messages
-          .map((msg) =>
-            msg?.message?.message_id && typeof msg.message.message_id === 'string'
-              ? msg.message.message_id
-              : null
-          )
-          .filter((id): id is string => Boolean(id))
+          .map((msg: { message?: { message_id?: unknown } }) => {
+            const id = msg?.message?.message_id
+            return typeof id === 'string' ? id : null
+          })
+          .filter((id: string | null): id is string => Boolean(id))
       )
     )
     const failedAttemptsByMessageId = new Map<string, number>()
