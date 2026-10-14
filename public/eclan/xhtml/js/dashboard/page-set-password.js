@@ -40,6 +40,36 @@
 		window.history.replaceState(null, "", window.location.pathname);
 	}
 
+	// Para el hash legacy (#access_token=…): supabase-js lo lee de forma
+	// ASÍNCRONA al inicializar el cliente (detectSessionInUrl). Si se limpia
+	// la URL antes de que termine esa lectura, ya no tiene de dónde sacar el
+	// token y la sesión nunca se crea — por eso esta función espera a que
+	// getSession() la vea, o al evento SIGNED_IN/PASSWORD_RECOVERY como
+	// respaldo, con un tope de tiempo antes de rendirse. AuthPage.tsx evita
+	// este mismo problema no tocando la URL hasta después de guardar la
+	// contraseña; acá se espera a tener sesión confirmada en su lugar.
+	function waitForSession(timeoutMs) {
+		return supabase.auth.getSession().then(function (res) {
+			if (res.data && res.data.session) return res.data.session;
+			return new Promise(function (resolve) {
+				var done = false;
+				var sub = supabase.auth.onAuthStateChange(function (_event, session) {
+					if (done || !session) return;
+					done = true;
+					clearTimeout(timer);
+					sub.data.subscription.unsubscribe();
+					resolve(session);
+				});
+				var timer = setTimeout(function () {
+					if (done) return;
+					done = true;
+					sub.data.subscription.unsubscribe();
+					resolve(null);
+				}, timeoutMs);
+			});
+		});
+	}
+
 	// El link puede llegar en 3 formatos, según la versión de Supabase:
 	// "?code=…" (PKCE), "?token_hash=…&type=…" (verificación OTP), o el hash
 	// legacy "#access_token=…&type=…" (supabase-js lo hidrata solo al cargar
@@ -75,12 +105,12 @@
 			showOnly($form);
 		});
 	} else {
-		// Hash legacy (o navegación directa sin token): si supabase-js ya
-		// hidrató una sesión desde el hash, getSession() la ve; si no, el
-		// link es inválido/expirado o ya se usó.
-		stripUrl();
-		supabase.auth.getSession().then(function (res) {
-			if (res.data && res.data.session) { showOnly($form); return; }
+		// Hash legacy (o navegación directa sin token): NO se toca la URL
+		// todavía — ver waitForSession. Solo se limpia después de saber si
+		// apareció sesión (éxito o timeout).
+		waitForSession(5000).then(function (session) {
+			stripUrl();
+			if (session) { showOnly($form); return; }
 			showLinkError("Link inválido o expirado.");
 		});
 	}
