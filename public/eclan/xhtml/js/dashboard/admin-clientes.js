@@ -20,7 +20,12 @@
 	var supabase = AuditClient.supabase;
 	var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 	var CURRENCY_RE = /^[A-Z]{3}$/;
-	var REDIRECT_TO = window.location.origin + "/eclan/xhtml/page-login.html"; // mismo que admin.js
+	// Mientras Eclan no tenga su propia pantalla para elegir contraseña
+	// (page-set-password.html, propuesta pendiente de aprobar), el link de
+	// invitación/reset tiene que caer en /app/auth: es la única pantalla que
+	// sabe procesar el token (verifyOtp/exchangeCodeForSession) y llamar a
+	// supabase.auth.updateUser. page-login.html no tiene ese paso.
+	var REDIRECT_TO = window.location.origin + "/app/auth"; // mismo que admin.js
 
 	var currentUserId = null;
 	var firstLoad = true;

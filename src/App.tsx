@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Menu, FileText, Network, CalendarClock } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 // --- Portado desde Ad-Audit-Platform (login con prioridad + resto de la
-// plantilla, montado bajo /app). "/" sigue siendo Index.tsx (redirige al
-// panel de Eclan/Windsor.ai en public/eclan), sin tocar. ---
+// plantilla, montado bajo /app). El código queda tal cual en el repo, pero
+// ni "/" (Index.tsx) ni "/app"/"/app/*" (AdAuditThemeScope, más abajo)
+// renderizan ya esta app React — ambos redirigen a Eclan (page-login.html
+// o clientes.html, según haya sesión). La interfaz real es Eclan. ---
 import { useAuth } from "@/hooks/useAuth";
 import AppSidebar from "@/components/AppSidebar";
 import NotificationCenter from "@/components/NotificationCenter";
@@ -34,26 +36,25 @@ import logo from "@/assets/apache-studio-logo.png.asset.json";
 
 const queryClient = new QueryClient();
 
-/** Aplica el theme "Aside" (colores/tipografía) sólo mientras se está en
- *  /app, sin afectar el resto del sitio (Index, Eclan). La clase va en
- *  <html> (no en un div anidado) porque tanto los charts de ECharts
- *  (src/lib/echarts-theme.ts lee getComputedStyle(document.documentElement))
- *  como el contenido de Radix que hace portal (Select/Dialog/Sheet/
- *  Tooltip/Toast, que se montan en document.body, fuera del árbol de
- *  React) necesitan que las variables CSS vivan en la raíz del documento,
- *  no en un descendiente — igual que .dark, que useTheme() también aplica
- *  sobre <html>. Ver src/index.css — clase .ad-audit-theme. */
+/** La interfaz que ve el cliente es Eclan (public/eclan/xhtml), no esta app
+ *  React — ver CLAUDE.md. /app es el elemento compartido de TODA esa rama
+ *  de rutas (auth, admin, clientes, auditoría, etc.); en vez de montar el
+ *  Outlet y dejar entrar a las páginas React, redirige a Eclan: a
+ *  page-login.html si no hay sesión, a clientes.html si ya la hay (mismo
+ *  proyecto de Supabase, misma sesión en localStorage que usa AuditClient
+ *  en Eclan). El código de las páginas de /app queda en el repo tal cual,
+ *  sin borrar — solo deja de ser alcanzable por navegación normal. */
 function AdAuditThemeScope() {
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    document.documentElement.classList.add("ad-audit-theme");
-    return () => {
-      document.documentElement.classList.remove("ad-audit-theme");
-    };
-  }, []);
+    if (loading) return;
+    window.location.replace(user ? "/eclan/xhtml/clientes.html" : "/eclan/xhtml/page-login.html");
+  }, [user, loading]);
 
   return (
-    <div className="min-h-screen">
-      <Outlet />
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }
@@ -115,10 +116,17 @@ const App = () => (
           {/* Sitio existente — sin cambios */}
           <Route path="/" element={<Index />} />
 
+          {/* Únicos dos caminos de /app que SÍ se renderizan de verdad:
+              /app/auth procesa los links de invitación/recuperación
+              (verifyOtp/exchangeCodeForSession + updateUser — Eclan no
+              tiene ese paso todavía) y /app/unsubscribe es el link público
+              de los correos. Van FUERA de <AdAuditThemeScope>: si quedaran
+              anidados ahí, nunca se montarían (ver AdAuditThemeScope). */}
+          <Route path="/app/auth" element={<AuthPage />} />
+          <Route path="/app/unsubscribe" element={<UnsubscribePage />} />
+
           {/* Ad-Audit-Platform, portado completo bajo /app */}
           <Route path="/app" element={<AdAuditThemeScope />}>
-            <Route path="auth" element={<AuthPage />} />
-            <Route path="unsubscribe" element={<UnsubscribePage />} />
             <Route index element={<RequireAuth><AppShell><ClientsPage /></AppShell></RequireAuth>} />
             <Route path="client/:clientId" element={<RequireAuth><AppShell><AuditPage /></AppShell></RequireAuth>} />
             <Route path="audit/:id" element={<RequireAuth><AppShell><AuditDetailPage /></AppShell></RequireAuth>} />

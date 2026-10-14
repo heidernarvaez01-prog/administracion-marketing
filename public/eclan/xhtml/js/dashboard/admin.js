@@ -5,6 +5,13 @@
 	var supabase = AuditClient.supabase;
 	var currentUserId = null;
 
+	// Mientras Eclan no tenga su propia pantalla para elegir contraseña
+	// (page-set-password.html, propuesta pendiente de aprobar), el link de
+	// invitación/reset tiene que caer en /app/auth: es la única pantalla que
+	// sabe procesar el token (verifyOtp/exchangeCodeForSession) y llamar a
+	// supabase.auth.updateUser. page-login.html no tiene ese paso.
+	var REDIRECT_TO = window.location.origin + "/app/auth"; // mismo que admin-clientes.js
+
 	var $loading = $("#adminLoading");
 	var $content = $("#adminContent");
 	var $authRequired = $("#authRequired");
@@ -38,13 +45,6 @@
 		);
 	}
 
-	function renderAccountOptions() {
-		$("#formAccount").html('<option value="">Sin cuenta aún</option>' + accounts.map(function (a) {
-			var key = a.account_id + "|" + (a.platform || "");
-			return '<option value="' + escapeHtml(key) + '">' + escapeHtml(a.account_name || a.account_id) + (a.platform ? " (" + escapeHtml(a.platform) + ")" : "") + "</option>";
-		}).join(""));
-	}
-
 	function renderMembers() {
 		if (!users.length) {
 			$("#membersTableBody").html('<tr><td colspan="4" class="text-center text-muted py-4">Aún no hay miembros invitados.</td></tr>');
@@ -54,7 +54,7 @@
 			var admin = isAdminUser(u.id);
 			var accs = assignmentsFor(u.id);
 			var accHtml = accs.length
-				? accs.map(function (a) { return '<span class="badge bg-light text-dark me-1 mb-1">' + escapeHtml(a.account_name || a.account_id) + '<a href="javascript:;" class="text-danger ms-1 remove-assignment-btn" data-id="' + a.id + '"><i class="fa fa-times"></i></a></span>'; }).join("")
+				? accs.map(function (a) { return '<span class="badge bg-light text-dark me-1 mb-1">' + escapeHtml(a.account_name || a.account_id) + '</span>'; }).join("")
 				: '<span class="text-muted fs-12">Ninguna</span>';
 			return (
 				"<tr>" +
@@ -93,7 +93,6 @@
 				accounts.push({ account_id: r.account_id, account_name: r.account_name, platform: r.plataforma });
 			});
 			renderStats();
-			renderAccountOptions();
 			renderMembers();
 		});
 	}
@@ -101,7 +100,6 @@
 	$("#submitFormBtn").on("click", function () {
 		var email = $("#formEmail").val().trim().toLowerCase();
 		var role = $("#formRole").val();
-		var accountKey = $("#formAccount").val();
 		var $err = $("#formError").addClass("d-none");
 
 		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $err.text("Correo inválido.").removeClass("d-none"); return; }
@@ -111,7 +109,7 @@
 		if (existing) {
 			uidPromise = Promise.resolve(existing.id);
 		} else {
-			uidPromise = supabase.functions.invoke("admin-users", { body: { action: "invite", email: email, redirectTo: window.location.origin + "/eclan/xhtml/page-login.html" } })
+			uidPromise = supabase.functions.invoke("admin-users", { body: { action: "invite", email: email, redirectTo: REDIRECT_TO } })
 				.then(function (res) {
 					if (res.error || (res.data && res.data.error)) throw new Error((res.error && res.error.message) || (res.data && res.data.error) || "No se pudo enviar la invitación");
 					return loadData().then(function () {
@@ -129,20 +127,9 @@
 			} else if (role === "user") {
 				chain = chain.then(function () { return supabase.from("user_roles").upsert({ user_id: uid, role: "user" }, { onConflict: "user_id,role" }); });
 			}
-			if (accountKey) {
-				var acc = accounts.filter(function (a) { return (a.account_id + "|" + (a.platform || "")) === accountKey; })[0];
-				if (acc) {
-					chain = chain.then(function () {
-						return supabase.from("account_assignments").insert({
-							user_id: uid, account_id: acc.account_id, account_name: acc.account_name, platform: acc.platform, created_by: currentUserId,
-						});
-					});
-				}
-			}
 			return chain;
 		}).then(function () {
 			$("#formEmail").val("");
-			$("#formAccount").val("");
 			$("#formRole").val("user");
 			return loadData();
 		}).catch(function (err) {
@@ -160,7 +147,7 @@
 
 	$(document).on("click", ".send-reset-btn", function () {
 		var email = $(this).data("email");
-		supabase.functions.invoke("admin-users", { body: { action: "reset_password", email: email, redirectTo: window.location.origin + "/eclan/xhtml/page-login.html" } })
+		supabase.functions.invoke("admin-users", { body: { action: "reset_password", email: email, redirectTo: REDIRECT_TO } })
 			.then(function (res) {
 				if (res.error || (res.data && res.data.error)) { alert("No se pudo enviar el link."); return; }
 				alert("Link de reseteo enviado a " + email);
@@ -169,7 +156,7 @@
 
 	$(document).on("click", ".resend-invite-btn", function () {
 		var email = $(this).data("email");
-		supabase.functions.invoke("admin-users", { body: { action: "invite", email: email, redirectTo: window.location.origin + "/eclan/xhtml/page-login.html" } })
+		supabase.functions.invoke("admin-users", { body: { action: "invite", email: email, redirectTo: REDIRECT_TO } })
 			.then(function (res) {
 				if (res.error || (res.data && res.data.error)) { alert("No se pudo reenviar."); return; }
 				alert("Invitación reenviada a " + email);
@@ -184,14 +171,15 @@
 			supabase.functions.invoke("admin-users", { body: { action: "delete_user", userId: uid } }).then(function () { loadData(); });
 			return;
 		}
+		// Borra también client_members/agency_members: antes solo se borraban
+		// account_assignments/user_roles, así que un viewer o manager revocado
+		// conservaba su acceso real a clientes/cuentas vía esas tablas.
 		Promise.all([
 			supabase.from("account_assignments").delete().eq("user_id", uid),
 			supabase.from("user_roles").delete().eq("user_id", uid),
+			supabase.from("client_members").delete().eq("user_id", uid),
+			supabase.from("agency_members").delete().eq("user_id", uid),
 		]).then(function () { loadData(); });
-	});
-
-	$(document).on("click", ".remove-assignment-btn", function () {
-		supabase.from("account_assignments").delete().eq("id", $(this).data("id")).then(function () { loadData(); });
 	});
 
 	$("#logoutLink").on("click", function (e) { e.preventDefault(); AuditClient.signOut(); });

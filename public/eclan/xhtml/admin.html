@@ -1020,20 +1020,16 @@
 					<div class="card mb-4">
 						<div class="card-header"><h4 class="card-title"><i class="fa fa-user-plus me-2"></i>Añadir miembro</h4></div>
 						<div class="card-body">
-							<p class="fs-13 text-muted">Enviamos un correo con el link para que active su cuenta y elija contraseña. La cuenta publicitaria es opcional.</p>
+							<p class="fs-13 text-muted">Enviamos un correo con el link para que active su cuenta y elija contraseña. El acceso a cuentas publicitarias se asigna aparte, desde la pestaña "Clientes y Agencias".</p>
 							<div id="formError" class="alert alert-danger py-2 px-3 d-none"></div>
 							<div class="row g-2 align-items-end">
-								<div class="col-md-4">
+								<div class="col-md-6">
 									<label class="form-label fs-13">Correo del miembro</label>
 									<input type="email" class="form-control" id="formEmail" placeholder="persona@empresa.com">
 								</div>
-								<div class="col-md-3">
+								<div class="col-md-4">
 									<label class="form-label fs-13">Rol</label>
 									<select class="form-control" id="formRole"><option value="user">Miembro</option><option value="admin">Administrador</option></select>
-								</div>
-								<div class="col-md-3">
-									<label class="form-label fs-13">Cuenta (opcional)</label>
-									<select class="form-control" id="formAccount"><option value="">Sin cuenta aún</option></select>
 								</div>
 								<div class="col-md-2">
 									<button type="button" class="btn btn-primary w-100" id="submitFormBtn"><i class="fa fa-paper-plane me-1"></i>Añadir</button>
@@ -1044,10 +1040,13 @@
 
 					<!-- Lista de miembros -->
 					<div class="card">
-						<div class="card-header"><h4 class="card-title">Miembros</h4></div>
+						<div class="card-header">
+							<h4 class="card-title">Miembros</h4>
+							<p class="fs-12 text-muted mb-0">Las cuentas asignadas aquí son del sistema de auditoría antiguo (account_assignments) y solo se muestran para referencia — ya no se editan desde esta pestaña. El acceso de viewers/managers a clientes y cuentas se gestiona en "Clientes y Agencias".</p>
+						</div>
 						<div class="table-responsive">
 							<table class="table table-striped mb-0">
-								<thead><tr><th>Correo</th><th>Rol</th><th>Cuentas asignadas</th><th></th></tr></thead>
+								<thead><tr><th>Correo</th><th>Rol</th><th>Cuentas asignadas (solo lectura)</th><th></th></tr></thead>
 								<tbody id="membersTableBody"></tbody>
 							</table>
 						</div>
