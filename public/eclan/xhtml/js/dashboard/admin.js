@@ -179,7 +179,13 @@
 			supabase.from("user_roles").delete().eq("user_id", uid),
 			supabase.from("client_members").delete().eq("user_id", uid),
 			supabase.from("agency_members").delete().eq("user_id", uid),
-		]).then(function () { loadData(); });
+		]).then(function (results) {
+			var failed = results.filter(function (r) { return r.error; });
+			if (failed.length) {
+				alert("No se pudo revocar completamente el acceso: " + failed.map(function (r) { return r.error.message; }).join("; "));
+			}
+			loadData();
+		});
 	});
 
 	$("#logoutLink").on("click", function (e) { e.preventDefault(); AuditClient.signOut(); });

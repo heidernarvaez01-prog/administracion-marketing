@@ -12,9 +12,14 @@ import NotFound from "./pages/NotFound";
 
 // --- Portado desde Ad-Audit-Platform (login con prioridad + resto de la
 // plantilla, montado bajo /app). El código queda tal cual en el repo, pero
-// ni "/" (Index.tsx) ni "/app"/"/app/*" (AdAuditThemeScope, más abajo)
-// renderizan ya esta app React — ambos redirigen a Eclan (page-login.html
-// o clientes.html, según haya sesión). La interfaz real es Eclan. ---
+// "/" (Index.tsx) y casi todo "/app"/"/app/*" (AdAuditThemeScope, más
+// abajo) ya no renderizan esta app React — redirigen a Eclan
+// (page-login.html o clientes.html, según haya sesión). La interfaz real
+// es Eclan. Dos rutas siguen siendo React de verdad: /app/auth (único
+// lugar que sabe procesar los links de invitación/recuperación — Eclan no
+// tiene ese paso todavía) y /app/unsubscribe (link público de los
+// correos); ambas usan AuthThemeScope, que sigue aplicando la clase
+// .ad-audit-theme igual que antes. ---
 import { useAuth } from "@/hooks/useAuth";
 import AppSidebar from "@/components/AppSidebar";
 import NotificationCenter from "@/components/NotificationCenter";
@@ -57,6 +62,28 @@ function AdAuditThemeScope() {
       <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
+}
+
+/** Aplica el theme "Aside" (colores/tipografía) para las dos rutas de /app
+ *  que todavía renderizan React de verdad (AuthPage, UnsubscribePage) —
+ *  mismo useEffect que antes tenía AdAuditThemeScope para toda la rama.
+ *  La clase va en <html> (no en un div anidado) porque tanto los charts de
+ *  ECharts (src/lib/echarts-theme.ts lee
+ *  getComputedStyle(document.documentElement)) como el contenido de Radix
+ *  que hace portal (Select/Dialog/Sheet/Tooltip/Toast, que se montan en
+ *  document.body, fuera del árbol de React) necesitan que las variables
+ *  CSS vivan en la raíz del documento, no en un descendiente — igual que
+ *  .dark, que useTheme() también aplica sobre <html>. Ver src/index.css —
+ *  clase .ad-audit-theme. */
+function AuthThemeScope({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    document.documentElement.classList.add("ad-audit-theme");
+    return () => {
+      document.documentElement.classList.remove("ad-audit-theme");
+    };
+  }, []);
+
+  return <>{children}</>;
 }
 
 function AppShell({ children }: { children: React.ReactNode }) {
@@ -120,10 +147,11 @@ const App = () => (
               /app/auth procesa los links de invitación/recuperación
               (verifyOtp/exchangeCodeForSession + updateUser — Eclan no
               tiene ese paso todavía) y /app/unsubscribe es el link público
-              de los correos. Van FUERA de <AdAuditThemeScope>: si quedaran
-              anidados ahí, nunca se montarían (ver AdAuditThemeScope). */}
-          <Route path="/app/auth" element={<AuthPage />} />
-          <Route path="/app/unsubscribe" element={<UnsubscribePage />} />
+              de los correos. Van FUERA de <AdAuditThemeScope> (si quedaran
+              anidados ahí, nunca se montarían), pero con AuthThemeScope
+              para conservar el theme "Aside" que ya tenían. */}
+          <Route path="/app/auth" element={<AuthThemeScope><AuthPage /></AuthThemeScope>} />
+          <Route path="/app/unsubscribe" element={<AuthThemeScope><UnsubscribePage /></AuthThemeScope>} />
 
           {/* Ad-Audit-Platform, portado completo bajo /app */}
           <Route path="/app" element={<AdAuditThemeScope />}>
