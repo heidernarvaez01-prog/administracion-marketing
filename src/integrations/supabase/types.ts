@@ -86,6 +86,53 @@ export type Database = {
         }
         Relationships: []
       }
+      agencies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      agency_members: {
+        Row: {
+          agency_id: string
+          created_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_members_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alert_events: {
         Row: {
           alert_type: string
@@ -178,6 +225,7 @@ export type Database = {
       }
       audit_clients: {
         Row: {
+          agency_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -189,6 +237,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          agency_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -200,6 +249,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          agency_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -210,7 +260,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_clients_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_records: {
         Row: {
@@ -915,9 +973,42 @@ export type Database = {
           },
         ]
       }
+      v_meta_daily_campaign: {
+        Row: {
+          account_id: string | null
+          campaign_id: string | null
+          campaign_name: string | null
+          clicks: number | null
+          client_id: string | null
+          currency: string | null
+          fecha: string | null
+          impressions: number | null
+          spend: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_view_account: { Args: { _account_id: string }; Returns: boolean }
+      client_period_totals: {
+        Args: { _days?: number }
+        Returns: {
+          clicks: number
+          client_id: string
+          currency: string
+          impressions: number
+          last_fecha: string
+          spend: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -925,8 +1016,38 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_agency_manager: { Args: { _agency_id: string }; Returns: boolean }
+      is_client_agency_manager: {
+        Args: { _client_id: string }
+        Returns: boolean
+      }
       is_client_member: { Args: { _client_id: string }; Returns: boolean }
       is_client_owner: { Args: { _client_id: string }; Returns: boolean }
+      meta_campaign_totals: {
+        Args: { _client_id?: string; _days?: number }
+        Returns: {
+          account_id: string
+          campaign_id: string
+          campaign_name: string
+          clicks: number
+          client_id: string
+          currency: string
+          first_fecha: string
+          impressions: number
+          last_fecha: string
+          spend: number
+        }[]
+      }
+      meta_daily_totals: {
+        Args: { _client_id?: string; _days?: number }
+        Returns: {
+          clicks: number
+          currency: string
+          fecha: string
+          impressions: number
+          spend: number
+        }[]
+      }
       release_sync_lock: {
         Args: { _holder: string; _name: string }
         Returns: undefined
