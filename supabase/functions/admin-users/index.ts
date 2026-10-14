@@ -99,6 +99,8 @@ async function handleDeleteUser(admin: SupabaseClient, body: any, callerId: stri
   // Clean up app-level rows first; foreign keys may not cascade.
   await admin.from('account_assignments').delete().eq('user_id', targetId);
   await admin.from('user_roles').delete().eq('user_id', targetId);
+  await admin.from('client_members').delete().eq('user_id', targetId);
+  await admin.from('agency_members').delete().eq('user_id', targetId);
   const { error } = await admin.auth.admin.deleteUser(targetId);
   if (error) return json({ error: error.message }, 400);
   return json({ ok: true });
