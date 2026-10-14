@@ -210,39 +210,45 @@
 		renderCharts(row);
 	}
 
-	// --- Diagnóstico de IA (Edge Function audit-insight, sin JWT de usuario) ---
+	// --- Diagnóstico de IA (Edge Function audit-insight) ---
+	// audit-insight ahora exige sesión real (auth.getUser), por eso se manda
+	// el access_token de la sesión, no la anon key fija.
 	function generateInsight(row) {
 		var $btn = $("#ai-btn-" + row.id);
 		var $out = $("#ai-out-" + row.id);
 		var perf = computePerf(row.campaignRows);
 		$btn.prop("disabled", true).html('<span class="spinner-border spinner-border-sm me-1"></span>Generando…');
 
-		return fetch(SUPABASE_URL + "/functions/v1/audit-insight", {
-			method: "POST",
-			headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY },
-			body: JSON.stringify({
-				campaignData: {
-					campaignName: row.campaign_name,
-					platform: row.platform || "",
-					presupuestoTotal: row.presupuesto_total.toFixed(2),
-					gastoActual: row.metrics.gastoActual.toFixed(2),
-					presupuestoRestante: row.metrics.presupuestoRestante.toFixed(2),
-					diasTranscurridos: row.metrics.diasTranscurridos,
-					diasRestantes: row.metrics.diasRestantes,
-					pacingStatus: row.metrics.pacingStatus,
-					pacingPct: row.metrics.pacingPct.toFixed(1),
-					gastoDiarioActual: row.metrics.gastoDiarioActual.toFixed(2),
-					presupuestoDiarioIdeal: row.metrics.presupuestoDiarioIdeal.toFixed(2),
-					ctr: perf.ctr.toFixed(2),
-					cpc: perf.cpc.toFixed(2),
-					impressions: perf.impressions,
-					clicks: perf.clicks,
-					reach: (row.campaignRows || []).reduce(function (s, r) { return s + Number(r.reach || 0); }, 0),
-				},
-			}),
+		return AuditClient.getSession().then(function (session) {
+			if (!session) throw new Error("Sesión requerida.");
+			return fetch(SUPABASE_URL + "/functions/v1/audit-insight", {
+				method: "POST",
+				headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + session.access_token },
+				body: JSON.stringify({
+					campaignData: {
+						campaignName: row.campaign_name,
+						platform: row.platform || "",
+						presupuestoTotal: row.presupuesto_total.toFixed(2),
+						gastoActual: row.metrics.gastoActual.toFixed(2),
+						presupuestoRestante: row.metrics.presupuestoRestante.toFixed(2),
+						diasTranscurridos: row.metrics.diasTranscurridos,
+						diasRestantes: row.metrics.diasRestantes,
+						pacingStatus: row.metrics.pacingStatus,
+						pacingPct: row.metrics.pacingPct.toFixed(1),
+						gastoDiarioActual: row.metrics.gastoDiarioActual.toFixed(2),
+						presupuestoDiarioIdeal: row.metrics.presupuestoDiarioIdeal.toFixed(2),
+						ctr: perf.ctr.toFixed(2),
+						cpc: perf.cpc.toFixed(2),
+						impressions: perf.impressions,
+						clicks: perf.clicks,
+						reach: (row.campaignRows || []).reduce(function (s, r) { return s + Number(r.reach || 0); }, 0),
+					},
+				}),
+			});
 		})
 			.then(function (res) { return res.json(); })
 			.then(function (body) {
+				if (body.error) throw new Error(body.error);
 				var badge = body.riskLevel === "critical" ? '<span class="badge bg-danger me-2">Crítico</span>'
 					: body.riskLevel === "moderate" ? '<span class="badge bg-warning me-2">Moderado</span>'
 					: '<span class="badge bg-success me-2">Sin riesgo</span>';

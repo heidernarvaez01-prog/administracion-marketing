@@ -23,6 +23,13 @@ verify_jwt = true
 [functions.send-transactional-email]
 verify_jwt = true
 
+[functions.audit-insight]
+# No estaba listada (default true, igual que ahora) — se agrega el
+# comentario para que quede explícito: el candado real es adentro
+# (auth.getUser, 401 sin sesión; el brief se lee con el JWT del caller,
+# no con service role, para que RLS decida qué puede ver).
+verify_jwt = true
+
 [functions.preview-transactional-email]
 verify_jwt = false
 

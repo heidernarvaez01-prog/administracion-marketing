@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { chatCompletion } from "../_shared/openai.ts";
 
 const corsHeaders = {
@@ -7,10 +8,27 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Antes: service-role key + accountId del body sin validar — cualquiera
+    // con la anon key podía leer el brand_brief de cualquier cuenta (IDOR).
+    // Ahora exige sesión real y, si llega accountId, usa el JWT del caller
+    // para que RLS decida si puede verlo — nunca se bypassa con service role.
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+    });
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Sesión requerida." }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { campaignData } = await req.json();
 
     // Fetch brand brief context for the account, if available
@@ -18,37 +36,32 @@ serve(async (req) => {
     try {
       const accountId = campaignData?.accountId;
       if (accountId) {
-        const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-        const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-        if (SUPABASE_URL && SERVICE_KEY) {
-          const r = await fetch(
-            `${SUPABASE_URL}/rest/v1/brand_briefs?account_id=eq.${encodeURIComponent(accountId)}&select=*`,
-            { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
-          );
-          if (r.ok) {
-            const rows = await r.json();
-            const b = Array.isArray(rows) ? rows[0] : null;
-            if (b) {
-              const lines: string[] = [];
-              const push = (label: string, v: any) => { if (v != null && String(v).trim() !== "") lines.push(`- ${label}: ${v}`); };
-              push("Marca", b.marca);
-              push("Sitio web", b.sitio_web);
-              push("Mercado objetivo", b.mercado_objetivo);
-              push("Necesidad principal", b.necesidad_principal);
-              push("Descripción del proyecto", b.descripcion_proyecto);
-              push("Público objetivo", b.publico_objetivo);
-              push("Fundamentos de marca", b.fundamentos_marca);
-              push("Promesa de marca", b.promesa_marca);
-              push("Reasons why", b.reasons_why);
-              push("Personalidad / arquetipo", b.personalidad_marca);
-              push("Estilo y tono", b.estilo_tono);
-              push("Diferenciador", b.diferenciador);
-              push("Valores", b.valores_marca);
-              push("Insights", b.insights);
-              push("Benchmark", b.benchmark);
-              push("Presupuesto de campaña (brief)", b.presupuesto_campana);
-              if (lines.length) briefBlock = `\n\n### Contexto de marca\n${lines.join("\n")}\n`;
-            }
+        const { data: rows, error: briefErr } = await supabase
+          .from("brand_briefs")
+          .select("*")
+          .eq("account_id", accountId);
+        if (!briefErr) {
+          const b = Array.isArray(rows) ? rows[0] : null;
+          if (b) {
+            const lines: string[] = [];
+            const push = (label: string, v: any) => { if (v != null && String(v).trim() !== "") lines.push(`- ${label}: ${v}`); };
+            push("Marca", b.marca);
+            push("Sitio web", b.sitio_web);
+            push("Mercado objetivo", b.mercado_objetivo);
+            push("Necesidad principal", b.necesidad_principal);
+            push("Descripción del proyecto", b.descripcion_proyecto);
+            push("Público objetivo", b.publico_objetivo);
+            push("Fundamentos de marca", b.fundamentos_marca);
+            push("Promesa de marca", b.promesa_marca);
+            push("Reasons why", b.reasons_why);
+            push("Personalidad / arquetipo", b.personalidad_marca);
+            push("Estilo y tono", b.estilo_tono);
+            push("Diferenciador", b.diferenciador);
+            push("Valores", b.valores_marca);
+            push("Insights", b.insights);
+            push("Benchmark", b.benchmark);
+            push("Presupuesto de campaña (brief)", b.presupuesto_campana);
+            if (lines.length) briefBlock = `\n\n### Contexto de marca\n${lines.join("\n")}\n`;
           }
         }
       }
