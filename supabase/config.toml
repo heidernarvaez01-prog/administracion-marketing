@@ -33,6 +33,11 @@ verify_jwt = true
 # no con service role, para que RLS decida qué puede ver).
 verify_jwt = true
 
+[functions.lovable-chat]
+# Igual que audit-insight: no estaba listada (default true). Candado real
+# adentro (auth.getUser, 401 sin sesión).
+verify_jwt = true
+
 [functions.preview-transactional-email]
 verify_jwt = false
 
