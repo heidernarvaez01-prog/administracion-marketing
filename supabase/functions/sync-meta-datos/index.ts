@@ -56,6 +56,11 @@ const WINDSOR_FIELDS = [
   // Windsor request without omni/ranking fields, written to a different
   // table) rather than adding it to this one. See CLAUDE.md.
   "actions_landing_page_view",
+  // Leads y mensajería — verificados a nivel de anuncio junto con los campos
+  // de ranking de arriba (misma llamada, sin HTTP 400). actions_lead llega
+  // null los días sin leads (se guarda 0, ver mapRow). La métrica de
+  // mensajería cuenta conversaciones NUEVAS tras 7 días de inactividad.
+  "actions_lead", "actions_onsite_conversion_messaging_conversation_started_7d",
 ].join(",");
 
 // Sondeo de cuentas dormidas: solo lo mínimo para saber si volvieron a tener actividad.
@@ -189,6 +194,11 @@ function mapRow(r: any) {
     unique_ctr: toNum(r["unique_ctr"]),
     // publisher_platform intentionally not requested/mapped — see WINDSOR_FIELDS comment above.
     landing_page_views: toInt(r["actions_landing_page_view"]),
+    // Desvío intencional del patrón toInt (que deja null): Windsor manda
+    // null los días sin actividad, y aquí 0 es el valor correcto, no
+    // "sin dato" — así se puede sumar sin filtrar nulls en cada consulta.
+    leads: toInt(r["actions_lead"]) ?? 0,
+    messaging_conversations: toInt(r["actions_onsite_conversion_messaging_conversation_started_7d"]) ?? 0,
   };
 }
 
@@ -272,18 +282,22 @@ async function runFullSync(ctx: Ctx, account: AdAccount, windowDays: number): Pr
     rowsWritten = await upsertRows(ctx.supabase, mapped);
 
     // last_data_date = fecha más reciente con spend>0 o impresiones>0 (nunca retrocede).
+    // last_synced_at, en cambio, se actualiza en TODA corrida exitosa (haya
+    // habido actividad o no) — es lo que las tarjetas de Clientes muestran
+    // como "Actualizado hace X h", y last_data_date no sirve para eso porque
+    // no avanza en una corrida sin gasto/impresiones.
     const latest = latestActivityDate(
       mapped.map((m) => ({ date: m.fecha, spend: m.total_cost, impressions: m.impressions })),
     );
     const newLast = maxDate(account.last_data_date, latest);
-    if (newLast && newLast !== account.last_data_date) {
-      const { error } = await ctx.supabase
-        .from("ad_accounts")
-        .update({ last_data_date: newLast })
-        .eq("account_id", account.account_id);
-      if (error) throw error;
-      account.last_data_date = newLast;
-    }
+    const patch: Record<string, string> = { last_synced_at: started.toISOString() };
+    if (newLast && newLast !== account.last_data_date) patch.last_data_date = newLast;
+    const { error } = await ctx.supabase
+      .from("ad_accounts")
+      .update(patch)
+      .eq("account_id", account.account_id);
+    if (error) throw error;
+    if (patch.last_data_date) account.last_data_date = newLast!;
 
     await logRun(ctx, {
       account_id: account.account_id, mode: "completo", window_days: windowDays,
@@ -360,7 +374,14 @@ async function runProbe(
 }
 
 // Trabajo de sync (se ejecuta en segundo plano tras validar secreto y candado).
-async function doSync(runId: string): Promise<Response> {
+// overrideWindowDays: fuerza esa ventana para las cuentas en plan.full (las
+// "con datos"; dormidas/omitidas no se tocan) — uso manual, una vez, para
+// rellenar historial de columnas nuevas (ver CLAUDE.md / backfill de leads).
+// accountIds: si viene, acota el sync a esas cuentas nada más — un backfill
+// de 35 días de las 4 cuentas activas juntas podría pasar el límite de
+// tiempo de la función (la diaria de 7 días ya tarda ~2.5 min; Kemmerling
+// sola, ~94 s con 7 días), así que el backfill se corre una cuenta a la vez.
+async function doSync(runId: string, overrideWindowDays?: number, accountIds?: string[]): Promise<Response> {
   const startedMs = Date.now();
   const windsorApiKey = Deno.env.get("WINDSOR_API_KEY") ?? "";
   const json = (body: unknown, status: number) =>
@@ -405,7 +426,15 @@ async function doSync(runId: string): Promise<Response> {
     }));
 
     // 3) Aplicar la regla por cuenta.
-    const plan = classifyAccounts(accounts, ctx.today, firstSyncDone);
+    let plan = classifyAccounts(accounts, ctx.today, firstSyncDone);
+    if (accountIds && accountIds.length > 0) {
+      const wanted = new Set(accountIds);
+      plan = {
+        full: plan.full.filter((item) => wanted.has(item.account.account_id)),
+        dormant: plan.dormant.filter((a) => wanted.has(a.account_id)),
+        skipped: plan.skipped,
+      };
+    }
     let fullSynced = 0;
     let woken = 0;
     let errors = 0;
@@ -413,7 +442,8 @@ async function doSync(runId: string): Promise<Response> {
     // 3a) Sync completo de las cuentas con datos recientes (una llamada por cuenta:
     //     un fallo no tumba a las demás y el conteo de filas queda por cuenta).
     for (const item of plan.full) {
-      if (await runFullSync(ctx, { ...item.account }, item.windowDays)) fullSynced++;
+      const windowDays = overrideWindowDays ?? item.windowDays;
+      if (await runFullSync(ctx, { ...item.account }, windowDays)) fullSynced++;
       else errors++;
     }
 
@@ -478,6 +508,27 @@ Deno.serve(async (req) => {
     return json({ error: "unauthorized" }, 401);
   }
 
+  // backfill_days opcional en el body (mismo secreto de arriba): fuerza esa
+  // ventana en vez de la que tocaría por regla (7 días el día a día). Uso
+  // manual, puntual — tope de seguridad para no pedirle a Windsor un rango
+  // absurdo por error de tipeo. account_ids (opcional): acota el backfill a
+  // esas cuentas nada más, para correrlo una cuenta a la vez (ver doSync).
+  const MAX_BACKFILL_DAYS = 90;
+  let overrideWindowDays: number | undefined;
+  let accountIds: string[] | undefined;
+  try {
+    const body = await req.json();
+    const requested = Number(body?.backfill_days);
+    if (Number.isFinite(requested) && requested > 0) {
+      overrideWindowDays = Math.min(Math.trunc(requested), MAX_BACKFILL_DAYS);
+    }
+    if (Array.isArray(body?.account_ids) && body.account_ids.length > 0) {
+      accountIds = body.account_ids.filter((id: unknown) => typeof id === "string");
+    }
+  } catch {
+    // Sin body (la corrida diaria del cron no manda uno) — sigue sin override.
+  }
+
   // 2) Candado en la base: si hay otra corrida viva, no se arranca otra.
   const runId = crypto.randomUUID();
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -493,7 +544,7 @@ Deno.serve(async (req) => {
   // 3) Responder ya (202) y sincronizar en segundo plano; el candado se libera al terminar.
   const work = (async () => {
     try {
-      await doSync(runId);
+      await doSync(runId, overrideWindowDays, accountIds);
     } finally {
       await admin.rpc("release_sync_lock", { _name: LOCK_NAME, _holder: runId });
     }
