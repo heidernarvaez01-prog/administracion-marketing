@@ -28,6 +28,7 @@
 	<link rel="stylesheet" href="vendor/chartist/css/chartist.min.css">
     <link href="vendor/bootstrap-select/dist/css/bootstrap-select.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
+    <link href="css/audit-extras.css" rel="stylesheet">
 	<link href="https://cdn.lineicons.com/2.0/LineIcons.css" rel="stylesheet">
 
 </head>
@@ -754,8 +755,8 @@
 							<li class="nav-item dropdown header-profile">
                                 <a class="nav-link" href="#" role="button" data-bs-toggle="dropdown">
 									<div class="header-info">
-										<span>Samuel Anderson</span>
-										<small>Super Admin</small>
+										<span id="headerUserName"></span>
+										<small id="headerUserRole"></small>
 									</div>
                                     <img src="images/profile/pic1.jpg" width="20" alt=""/>
                                 </a>
@@ -1064,6 +1065,7 @@
 	<!-- Ad-Audit-Platform: selector de cliente compartido (brief/clusters/reporte) -->
 	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 	<script src="js/dashboard/supabase-client.js"></script>
+	<script src="js/dashboard/role-ui.js"></script>
 	<script src="js/dashboard/seleccionar-cliente.js"></script>
 
 </body>

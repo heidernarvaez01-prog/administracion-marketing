@@ -58,6 +58,45 @@
 		});
 	}
 
+	/** Identidad real del usuario logueado: email + rol ("Administrador",
+	 *  "Manager · <agencia>", "Viewer · <cliente>"), calculado desde
+	 *  user_roles / agency_members / client_members. Null sin sesión.
+	 *  Usado por role-ui.js (cabecera + menú) — es COSMÉTICO, la seguridad
+	 *  real sigue siendo RLS. No se usa .maybeSingle() en agency_members/
+	 *  client_members porque un usuario podría tener más de una fila (varios
+	 *  clientes como viewer); se toma la primera con .limit(1). */
+	function getCurrentIdentity() {
+		return getSession().then(function (session) {
+			if (!session) return null;
+			var userId = session.user.id;
+			var email = session.user.email;
+
+			return client.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").limit(1)
+				.then(function (res) {
+					if (res.data && res.data.length) {
+						return { email: email, role: "admin", label: "Administrador" };
+					}
+					return client.from("agency_members").select("agencies(name)").eq("user_id", userId).limit(1)
+						.then(function (res2) {
+							var row = res2.data && res2.data[0];
+							if (row) {
+								var agencyName = row.agencies && row.agencies.name;
+								return { email: email, role: "manager", label: "Manager · " + (agencyName || "agencia") };
+							}
+							return client.from("client_members").select("audit_clients(name)").eq("user_id", userId).limit(1)
+								.then(function (res3) {
+									var row3 = res3.data && res3.data[0];
+									if (row3) {
+										var clientName = row3.audit_clients && row3.audit_clients.name;
+										return { email: email, role: "viewer", label: "Viewer · " + (clientName || "cliente") };
+									}
+									return { email: email, role: null, label: "Sin acceso asignado" };
+								});
+						});
+				});
+		});
+	}
+
 	/** Traduce los mensajes de error más comunes de Supabase Auth a español. */
 	function authErrorMessage(error) {
 		var msg = (error && error.message) || "";
@@ -76,5 +115,6 @@
 		redirectIfAuthenticated: redirectIfAuthenticated,
 		signOut: signOut,
 		authErrorMessage: authErrorMessage,
+		getCurrentIdentity: getCurrentIdentity,
 	};
 })(window);

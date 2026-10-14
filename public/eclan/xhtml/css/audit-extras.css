@@ -75,3 +75,19 @@ tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: r
 	text-transform: uppercase;
 	font-family: monospace;
 }
+
+/* Paso 2: relleno de la plantilla sin funcionalidad real conectada todavía
+   (campana/mensajes/regalo, "+ New Campaign", buscador en inglés, chat de
+   contactos falsos). Se oculta para TODOS, sin importar el rol — no es
+   "cosmético por rol", es relleno que no existe. El único <li> que se
+   queda en ul.header-right es .header-profile (identidad real, ver
+   role-ui.js). */
+.header-right > li.nav-item.dropdown:not(.header-profile) {
+	display: none !important;
+}
+.header-left .search_bar {
+	display: none !important;
+}
+.chatbox {
+	display: none !important;
+}
