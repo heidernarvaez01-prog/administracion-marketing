@@ -79,6 +79,16 @@ Se sincronizan las 7 cuentas (propias y de The Lab), pero sin traer datos de cue
   (extensiones `pg_cron`/`pg_net`).
 - **No mover archivos entre las dos carpetas.** Moverlos rompería el tracking de migraciones de la herramienta que las gestiona (Supabase CLI vs. Drizzle).
 
+## Despliegue de Edge Functions
+Subir el código a GitHub **no** redespliega las Edge Functions — Lovable no redespliega solo al
+ver un push. Para que un cambio en `supabase/functions/*/index.ts` quede realmente activo:
+1. Pedirle a Lovable, en su chat, "Redespliega la función `<nombre>` con el código actual del
+   repo" (una por una, o varias si hace falta).
+2. Verificar con una llamada real antes de dar el paso por cerrado — no basta con que Lovable
+   diga que desplegó bien. Para una función que ahora exige sesión: sin header `Authorization`
+   (o con la anon key) debe dar `401`. Para `sync-meta-datos`/webhooks con secreto: sin el header
+   del secreto debe dar `401` igual.
+
 ## Protección de `sync-meta-datos` (implementada por Lovable, 2026-10-13)
 - La función sigue con `verify_jwt = false` en `config.toml` (necesario: el cron la llama sin JWT de usuario), pero ahora valida ella misma un secreto
   compartido: header `x-sync-secret` comparado en tiempo constante contra el secret de función `SYNC_CRON_SECRET`. Sin header válido → `401`.
