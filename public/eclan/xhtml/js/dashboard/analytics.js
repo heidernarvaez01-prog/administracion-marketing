@@ -74,7 +74,7 @@
 
 	// createElement/textContent para ad.campaign/ad.adName/ad.datasource: son
 	// datos reales de Meta (meta_datos), nunca HTML de confianza.
-	function renderAdList(selector, ads, valueLabel) {
+	function renderAdList(selector, ads, valueLabel, currency) {
 		var $container = $(selector);
 		if ($container.length === 0) return;
 
@@ -96,7 +96,7 @@
 				"</div>" +
 				'<div class="d-flex col-md-5 col-sm-6 col-xxl-7 align-items-center justify-content-between">' +
 				'<div class="d-flex mb-4 align-items-center">' +
-				"<div><h3 class=\"fs-20 text-black mb-0\">" + WindsorClient.money(ad.spend) + "</h3>" +
+				"<div><h3 class=\"fs-20 text-black mb-0\">" + WindsorClient.money(ad.spend, currency) + "</h3>" +
 				'<span class="fs-14">Gasto</span></div>' +
 				"</div>" +
 				'<div class="d-flex mb-4 align-items-center">' +
@@ -115,10 +115,10 @@
 	function renderKpis(data) {
 		$("#kpiTotalCampaigns").text(WindsorClient.compact(data.kpis.totalCampaigns));
 		$("#kpiTotalImpressions").text(WindsorClient.compact(data.kpis.totalImpressions));
-		$("#kpiSpendYesterday").text(WindsorClient.money(data.kpis.spendYesterday));
-		$("#kpiSpendToday").text(WindsorClient.money(data.kpis.spendToday));
+		$("#kpiSpendYesterday").text(WindsorClient.money(data.kpis.spendYesterday, data.currency));
+		$("#kpiSpendToday").text(WindsorClient.money(data.kpis.spendToday, data.currency));
 		$("#kpiClickSummaryTotal").text(WindsorClient.compact(data.kpis.totalClicks));
-		$("#kpiSpendSummaryTotal").text(WindsorClient.money(data.kpis.totalSpend));
+		$("#kpiSpendSummaryTotal").text(WindsorClient.money(data.kpis.totalSpend, data.currency));
 
 		var labels = (data.clickSummary && data.clickSummary.labels) || [];
 		var desde = labels[0];
@@ -138,7 +138,7 @@
 		return labels.map(WindsorClient.shortDate);
 	}
 
-	function lineChart(canvasId, labels, values, color, label, moneyAxis) {
+	function lineChart(canvasId, labels, values, color, label, moneyAxis, currency) {
 		var el = document.getElementById(canvasId);
 		if (!el) return;
 		el.height = 300;
@@ -173,7 +173,7 @@
 						intersect: false,
 						callbacks: {
 							label: function (ctx) {
-								return label + ": " + (moneyAxis ? WindsorClient.money(ctx.parsed.y) : WindsorClient.compact(ctx.parsed.y));
+								return label + ": " + (moneyAxis ? WindsorClient.money(ctx.parsed.y, currency) : WindsorClient.compact(ctx.parsed.y));
 							},
 						},
 					},
@@ -186,7 +186,7 @@
 						ticks: {
 							color: "#7e7e7e",
 							callback: function (v) {
-								return moneyAxis ? WindsorClient.money(v) : WindsorClient.compact(v);
+								return moneyAxis ? WindsorClient.money(v, currency) : WindsorClient.compact(v);
 							},
 						},
 					},
@@ -317,11 +317,29 @@
 	}
 
 	var currentPreset = "last_90d";
+	var selectedCurrency = null;
 	var lastData = null;
 
 	function setLoading(on) {
 		$("#rangeSubtitle").text(on ? "Cargando datos de Windsor.ai…" : $("#rangeSubtitle").text());
 		$(".range-tabs .nav-link").css("opacity", on ? 0.5 : 1);
+	}
+
+	// Nunca se oculta en silencio que hay más de una moneda: si currencies
+	// trae más de una, se muestra un selector (en vez de mezclar montos de
+	// MXN y USD en un solo KPI).
+	function renderCurrencyBar(data) {
+		var $bar = $("#analyticsCurrencyBar");
+		var $select = $("#analyticsCurrencySelect");
+		if (!data.currencies || data.currencies.length < 2) {
+			$bar.addClass("d-none");
+			return;
+		}
+		$select.empty();
+		data.currencies.forEach(function (cur) {
+			$select.append($("<option>", { value: cur, text: cur, selected: cur === data.currency }));
+		});
+		$bar.removeClass("d-none");
 	}
 
 	function loadRealData() {
@@ -330,19 +348,21 @@
 
 		AuditClient.requireAuth().then(function (session) {
 			if (!session) return null; // ya redirigió a page-login.html
-			return WindsorClient.fetchMetrics({ datePreset: currentPreset });
+			return WindsorClient.fetchMetrics({ datePreset: currentPreset, currency: selectedCurrency });
 		}).then(function (data) {
 			if (!data) return;
 			lastData = data;
+			selectedCurrency = data.currency;
 			setLoading(false);
+			renderCurrencyBar(data);
 			renderKpis(data);
 			lineChart("activity", data.clickSummary.labels, data.clickSummary.data, "rgb(82, 177, 65)", "Clics", false);
-			lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(236, 72, 153)", "Gasto", true);
+			lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(236, 72, 153)", "Gasto", true, data.currency);
 			renderGoalStatistic(data.objectiveBreakdown, data.ctrGauge);
 			renderPlatformBreakdown(data.plataformas);
 			renderEngagementChart(data.engagementByPlatform);
-			renderAdList("#mostPerformedAdsList", data.topAds.slice(0, 3), "Clics");
-			renderAdList("#trendingAdsList", data.topAds.slice(0, 3).reverse(), "Clics");
+			renderAdList("#mostPerformedAdsList", data.topAds.slice(0, 3), "Clics", data.currency);
+			renderAdList("#trendingAdsList", data.topAds.slice(0, 3).reverse(), "Clics", data.currency);
 		}).catch(function (err) {
 			setLoading(false);
 			console.error("windsor-metrics:", err);
@@ -362,6 +382,11 @@
 	}
 
 	jQuery(window).on("load", function () {
+		$(document).on("change", "#analyticsCurrencySelect", function () {
+			selectedCurrency = $(this).val();
+			loadRealData();
+		});
+
 		$(document).on("click", ".range-tabs .nav-link", function () {
 			var preset = $(this).data("preset");
 			if (!preset || preset === currentPreset) return;

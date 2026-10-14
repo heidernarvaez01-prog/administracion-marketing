@@ -102,7 +102,7 @@ serve(async (req) => {
     const reqUrl = new URL(req.url);
     const days = daysFromPreset(reqUrl.searchParams.get("date_preset"));
     const clientId = reqUrl.searchParams.get("client_id") || null;
-    const accountId = reqUrl.searchParams.get("account_id") || null;
+    const requestedCurrency = reqUrl.searchParams.get("currency") || null;
     const includeRaw = reqUrl.searchParams.get("raw") === "1";
 
     // Motor de auditoría/pacing (auditoria.js): necesita gasto por día Y
@@ -116,15 +116,20 @@ serve(async (req) => {
         return jsonResponse({ error: true, status: 400, mensaje: "raw=1 requiere client_id." }, 400);
       }
       const rows = await fetchAllRows<{
-        fecha: string; campaign_id: string; campaign_name: string;
+        fecha: string; campaign_id: string; account_id: string; campaign_name: string;
         spend: number; impressions: number; clicks: number;
       }>((from, to) =>
         supabase
           .from("v_meta_daily_campaign")
-          .select("fecha, campaign_id, campaign_name, spend, impressions, clicks")
+          .select("fecha, campaign_id, account_id, campaign_name, spend, impressions, clicks")
           .eq("client_id", clientId)
+          // Orden con desempate completo: dos filas nunca quedan en el
+          // mismo lugar relativo entre páginas (evita saltos/repetidos si
+          // (fecha, campaign_id) se repite entre cuentas o adsets).
           .order("fecha", { ascending: true })
           .order("campaign_id", { ascending: true })
+          .order("account_id", { ascending: true })
+          .order("campaign_name", { ascending: true })
           .range(from, to),
       );
       const dailyCampaignTotals = rows.map((r) => ({
@@ -155,29 +160,23 @@ serve(async (req) => {
     if (dailyRes.error) throw dailyRes.error;
     if (campaignRes.error) throw campaignRes.error;
 
-    let dailyRows: DailyTotalRow[] = dailyRes.data || [];
-    let campaignRows: CampaignTotalRow[] = campaignRes.data || [];
-
-    // account_id es un filtro más fino que client_id (una cuenta específica
-    // dentro del cliente); los RPC solo aceptan _client_id, así que ese
-    // recorte se aplica acá, sobre filas que RLS ya acotó.
-    if (accountId) {
-      campaignRows = campaignRows.filter((r) => r.account_id === accountId);
-    }
+    const dailyRows: DailyTotalRow[] = dailyRes.data || [];
+    const campaignRows: CampaignTotalRow[] = campaignRes.data || [];
 
     const currencies = Array.from(
       new Set([...dailyRows.map((r) => r.currency), ...campaignRows.map((r) => r.currency)]),
     ).sort();
 
-    // Nunca se suman monedas distintas: se elige la de mayor gasto como
-    // "principal" para el shape plano que compaign.html/analytics.html ya
-    // consumen (ninguna de las dos tiene UI multi-moneda todavía). Para un
-    // viewer/manager de un solo cliente esto nunca aplica (una sola moneda).
+    // Nunca se suman monedas distintas: se muestra una por vez. Por defecto
+    // la de mayor gasto; ?currency=XXX permite elegir otra (el front la
+    // ofrece como selector cuando currencies.length > 1 — nunca se oculta
+    // en silencio que hay más de una).
     const spendByCurrency = new Map<string, number>();
     for (const r of dailyRows) spendByCurrency.set(r.currency, (spendByCurrency.get(r.currency) ?? 0) + Number(r.spend || 0));
-    const primaryCurrency = currencies.length
+    const topCurrency = currencies.length
       ? [...spendByCurrency.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? currencies[0]
       : "USD";
+    const primaryCurrency = requestedCurrency && currencies.includes(requestedCurrency) ? requestedCurrency : topCurrency;
 
     const dailyPrimary = dailyRows.filter((r) => r.currency === primaryCurrency).sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
     const campaignsPrimary = campaignRows.filter((r) => r.currency === primaryCurrency).sort((a, b) => b.spend - a.spend);

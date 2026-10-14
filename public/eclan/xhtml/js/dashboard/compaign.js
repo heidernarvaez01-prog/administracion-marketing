@@ -19,7 +19,7 @@
 	// c.lastDate vienen de Meta (vía meta_datos) y nunca deben insertarse como
 	// HTML concatenado — un nombre de campaña con '<' rompería el markup o,
 	// peor, inyectaría HTML/JS.
-	function renderCampaignRow(c) {
+	function renderCampaignRow(c, currency) {
 		var statusClass = c.status === "On Going" ? "bgl-primary text-primary" : "bgl-danger text-danger";
 		var donutValue = Math.max(0, Math.min(100, c.ctr * 10)); // CTR real suele ser bajo (<10%); se escala x10 solo para que el donut visual no quede vacío
 		var donutPeity = JSON.stringify({
@@ -46,7 +46,7 @@
 			"</div>" +
 			'<div class="col-xl-2 col-xxl-6 col-lg-6 col-md-4 col-sm-8 px-3">' +
 			'<div class="row align-items-center my-2">' +
-			'<div class="col-6"><h3 class="fs-20 text-black">' + WindsorClient.money(c.spend) + '</h3><span class="fs-14">Gasto</span></div>' +
+			'<div class="col-6"><h3 class="fs-20 text-black">' + WindsorClient.money(c.spend, currency) + '</h3><span class="fs-14">Gasto</span></div>' +
 			'<div class="col-6"><h3 class="fs-20 text-black">' + WindsorClient.compact(c.clicks) + '</h3><span class="fs-14">Clics</span></div>' +
 			"</div>" +
 			"</div>" +
@@ -66,6 +66,25 @@
 		return row;
 	}
 
+	var selectedCurrency = null;
+
+	// Nunca se oculta en silencio que hay más de una moneda: si currencies
+	// trae más de una, se muestra un selector (en vez de mezclar montos de
+	// MXN y USD en una sola lista).
+	function renderCurrencyBar(data) {
+		var $bar = $("#campaignCurrencyBar");
+		var $select = $("#campaignCurrencySelect");
+		if (!data.currencies || data.currencies.length < 2) {
+			$bar.addClass("d-none");
+			return;
+		}
+		$select.empty();
+		data.currencies.forEach(function (cur) {
+			$select.append($("<option>", { value: cur, text: cur, selected: cur === data.currency }));
+		});
+		$bar.removeClass("d-none");
+	}
+
 	function loadCampaigns() {
 		var $container = $("#campaignList");
 		if ($container.length === 0 || typeof WindsorClient === "undefined" || typeof AuditClient === "undefined") return;
@@ -73,8 +92,11 @@
 		AuditClient.requireAuth().then(function (session) {
 			if (!session) return; // ya redirigió a page-login.html
 
-			WindsorClient.fetchMetrics({ datePreset: "last_90d" })
+			WindsorClient.fetchMetrics({ datePreset: "last_90d", currency: selectedCurrency })
 				.then(function (data) {
+					selectedCurrency = data.currency;
+					renderCurrencyBar(data);
+
 					if (!data.campaigns || !data.campaigns.length) {
 						$container.empty().append(
 							$("<p>", { class: "text-muted p-4 mb-0", text: "No hay campañas en el rango consultado." })
@@ -83,7 +105,7 @@
 					}
 
 					$container.empty();
-					data.campaigns.forEach(function (c) { $container.append(renderCampaignRow(c)); });
+					data.campaigns.forEach(function (c) { $container.append(renderCampaignRow(c, data.currency)); });
 
 					// Peity escanea el DOM al llamarse; hay que reinicializar
 					// después de inyectar los nuevos ".donut".
@@ -104,6 +126,10 @@
 	}
 
 	jQuery(window).on("load", function () {
+		$(document).on("change", "#campaignCurrencySelect", function () {
+			selectedCurrency = $(this).val();
+			loadCampaigns();
+		});
 		setTimeout(loadCampaigns, 300);
 	});
 })(jQuery);

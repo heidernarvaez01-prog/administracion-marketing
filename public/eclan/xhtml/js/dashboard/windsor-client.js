@@ -25,7 +25,7 @@
 		var params = [];
 		if (options.datePreset) params.push("date_preset=" + encodeURIComponent(options.datePreset));
 		if (options.clientId) params.push("client_id=" + encodeURIComponent(options.clientId));
-		if (options.accountId) params.push("account_id=" + encodeURIComponent(options.accountId));
+		if (options.currency) params.push("currency=" + encodeURIComponent(options.currency));
 		if (options.raw) params.push("raw=1");
 		if (params.length) url += "?" + params.join("&");
 
@@ -60,9 +60,14 @@
 		});
 	}
 
-	// Formatters chiquitos reutilizados por analytics.js / compaign.js
-	function money(n) {
-		return "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	// Formatters chiquitos reutilizados por analytics.js / compaign.js.
+	// currency es obligatorio en la práctica (compaign.js/analytics.js
+	// siempre lo mandan, tomado de data.currency) — sin él no hay forma de
+	// saber si el número es MXN o USD, y mostrar solo "$" ya causó que
+	// Ginecea (MXN) se leyera como si fuera dólares.
+	function money(n, currency) {
+		var formatted = Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+		return currency ? currency + " " + formatted : "$" + formatted;
 	}
 
 	function compact(n) {

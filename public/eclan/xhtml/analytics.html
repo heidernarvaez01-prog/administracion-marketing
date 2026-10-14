@@ -981,6 +981,11 @@
 					<div class="me-auto d-none d-lg-block">
 						<h2 class="text-black font-w600">Analítica</h2>
 						<p class="mb-0" id="rangeSubtitle">Cargando datos de Windsor.ai…</p>
+						<!-- Nunca se mezclan monedas: si hay más de una entre las cuentas visibles, este selector elige cuál mostrar -->
+						<div id="analyticsCurrencyBar" class="d-flex align-items-center gap-2 mt-2 d-none">
+							<label for="analyticsCurrencySelect" class="mb-0 text-muted">Moneda:</label>
+							<select id="analyticsCurrencySelect" class="form-select form-select-sm" style="width:auto;"></select>
+						</div>
 					</div>
 					<div class="d-none d-lg-flex align-items-center">
 						<div class="text-end">
