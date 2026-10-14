@@ -15,6 +15,15 @@
 	var allClients = [];
 	var statsByClient = {};
 	var isAdmin = false;
+	// Paso 4: datos reales de Meta por cliente, vía client_period_totals.
+	// metaStatsByClient[clientId][7|30] = [{currency, spend, impressions,
+	// clicks, leads, messaging_conversations}, ...] — un elemento por moneda
+	// si el cliente tiene cuentas en más de una (nunca se suman entre sí).
+	var metaStatsByClient = {};
+	// lastSyncByClient[clientId] = { lastSyncedAt, lastProbeAt } — el mayor
+	// entre las cuentas del cliente (normalmente solo tiene una).
+	var lastSyncByClient = {};
+	var currentWindow = 30;
 
 	var $clientModal = $("#clientModal");
 	var clientModalEl = document.getElementById("clientModal");
@@ -50,11 +59,20 @@
 		return "$" + v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
 	}
 
-	function fmtDate(iso) {
-		if (!iso) return "—";
+	// "hace X h" / "hace X días" — null si no hay fecha (caller decide el estado vacío).
+	function timeAgo(iso) {
+		if (!iso) return null;
 		var d = new Date(iso);
-		if (isNaN(d.getTime())) return "—";
-		return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+		if (isNaN(d.getTime())) return null;
+		var hours = Math.floor((Date.now() - d.getTime()) / 3600000);
+		if (hours < 1) return "hace menos de 1 h";
+		if (hours < 24) return "hace " + hours + " h";
+		var days = Math.floor(hours / 24);
+		return "hace " + days + (days === 1 ? " día" : " días");
+	}
+
+	function fmtCount(n) {
+		return Number(n || 0).toLocaleString("es-CO");
 	}
 
 	function renderSummary(clients) {
@@ -88,17 +106,6 @@
 		$alertBanner.removeClass("d-none");
 	}
 
-	function statusDots(stats) {
-		var parts = [];
-		if (stats.ok) parts.push('<span class="dot" style="background:#17c666;"></span>' + stats.ok + " en ritmo");
-		if (stats.under) parts.push('<span class="dot" style="background:#f3b023;"></span>' + stats.under + " subgastando");
-		if (stats.over) parts.push('<span class="dot" style="background:#ea4d4d;"></span>' + stats.over + " sobregastando");
-		if (!parts.length) return "";
-		return '<div class="status-dot-row text-muted d-flex flex-wrap gap-2 mt-2">' +
-			parts.map(function (p) { return '<span class="d-inline-flex align-items-center">' + p + "</span>"; }).join("") +
-			"</div>";
-	}
-
 	function renderClients(clients) {
 		if (!clients.length) {
 			showOnly($empty);
@@ -106,7 +113,6 @@
 		}
 		var html = clients.map(function (c, idx) {
 			var accent = ACCENTS[idx % ACCENTS.length];
-			var stats = statsByClient[c.id] || { campaigns: 0, budget: 0, spent: 0, last: null, ok: 0, under: 0, over: 0 };
 			var desc = c.description
 				? '<p class="text-muted fs-13 mb-0 text-ov">' + escapeHtml(c.description) + "</p>"
 				: '<p class="text-muted fs-13 mb-0 fst-italic">Sin descripción</p>';
@@ -135,22 +141,10 @@
 					"</div>"
 					: "") +
 				"</div>" +
-				'<div class="row text-center mt-4 mb-1">' +
-				'<div class="col-4 border-end">' +
-				'<h5 class="mb-0 font-w600">' + stats.campaigns + "</h5>" +
-				'<span class="fs-12 text-muted">Campañas</span>' +
-				"</div>" +
-				'<div class="col-4 border-end">' +
-				'<h5 class="mb-0 font-w600">' + money(stats.budget) + "</h5>" +
-				'<span class="fs-12 text-muted">Presupuesto</span>' +
-				"</div>" +
-				'<div class="col-4">' +
-				'<h5 class="mb-0 font-w600">' + money(stats.spent) + "</h5>" +
-				'<span class="fs-12 text-muted">Gasto</span>' +
-				"</div>" +
-				"</div>" +
-				statusDots(stats) +
-				'<p class="fs-12 text-muted text-center mt-2 mb-0">Última auditoría: ' + fmtDate(stats.last) + "</p>" +
+				// Datos reales de Meta (Paso 4) — se llenan con
+				// createElement/textContent justo después de insertar este
+				// HTML en el DOM, nunca concatenados acá (ver buildMetaStatsBlock).
+				'<div class="client-meta-stats" data-client-id="' + c.id + '"></div>' +
 				'<a href="auditoria.html?client_id=' + c.id + '" class="btn btn-outline-primary btn-sm w-100 mt-3">Abrir auditoría <i class="fa fa-arrow-right ms-1"></i></a>' +
 				"</div>" +
 				"</div>" +
@@ -158,7 +152,67 @@
 			);
 		}).join("");
 		$grid.html(html);
+		clients.forEach(function (c) {
+			var el = $grid.find('.client-meta-stats[data-client-id="' + c.id + '"]')[0];
+			if (el) el.appendChild(buildMetaStatsBlock(c.id));
+		});
 		showOnly($grid);
+	}
+
+	// Una celda "valor + etiqueta" del bloque de métricas reales.
+	function metaCell(label, value) {
+		var col = document.createElement("div");
+		col.className = "col";
+		var strong = document.createElement("div");
+		strong.className = "fw-bold fs-14 text-ov";
+		strong.textContent = value;
+		var span = document.createElement("span");
+		span.className = "fs-12 text-muted";
+		span.textContent = label;
+		col.appendChild(strong);
+		col.appendChild(span);
+		return col;
+	}
+
+	// Bloque de datos reales de Meta de un cliente, para la ventana actual
+	// (currentWindow: 7 o 30 días) — un row de 5 métricas por moneda (nunca
+	// se suman monedas distintas), más la línea de última sincronización.
+	// Todo por createElement/textContent: nada de esto es HTML de confianza.
+	function buildMetaStatsBlock(clientId) {
+		var wrap = document.createElement("div");
+		wrap.className = "mt-3";
+
+		var rows = (metaStatsByClient[clientId] && metaStatsByClient[clientId][currentWindow]) || [];
+		if (!rows.length) {
+			var empty = document.createElement("p");
+			empty.className = "fs-13 text-muted text-center mb-0";
+			empty.textContent = "Sin datos de Meta todavía";
+			wrap.appendChild(empty);
+		} else {
+			rows.forEach(function (row) {
+				var grid = document.createElement("div");
+				grid.className = "row text-center gx-1 mb-2";
+				grid.appendChild(metaCell("Gasto", (row.currency || "") + " " + fmtCount(row.spend)));
+				grid.appendChild(metaCell("Impresiones", fmtCount(row.impressions)));
+				grid.appendChild(metaCell("Clics", fmtCount(row.clicks)));
+				grid.appendChild(metaCell("Leads", row.leads == null ? "—" : fmtCount(row.leads)));
+				grid.appendChild(metaCell("Conversac.", row.messaging_conversations == null ? "—" : fmtCount(row.messaging_conversations)));
+				wrap.appendChild(grid);
+			});
+		}
+
+		var sync = lastSyncByClient[clientId];
+		var syncText = sync && sync.lastSyncedAt ? "Actualizado " + timeAgo(sync.lastSyncedAt)
+			: sync && sync.lastProbeAt ? "Revisado " + timeAgo(sync.lastProbeAt)
+			: null;
+		if (syncText) {
+			var syncLine = document.createElement("p");
+			syncLine.className = "fs-12 text-muted text-center mt-1 mb-0";
+			syncLine.textContent = syncText;
+			wrap.appendChild(syncLine);
+		}
+
+		return wrap;
 	}
 
 	function applyFilter() {
@@ -212,6 +266,54 @@
 		});
 	}
 
+	// Paso 4: gasto/impresiones/clics/leads/conversaciones reales de Meta,
+	// por cliente y por moneda, vía client_period_totals (agregado en SQL,
+	// nunca sumando filas de meta_datos en el navegador). Los 2 rangos (7 y
+	// 30 días) se piden una vez cada uno; cambiar el toggle solo re-pinta,
+	// no vuelve a pedir nada. "Actualizado"/"Revisado" viene de
+	// ad_accounts (last_synced_at/last_probe_at), no del RPC.
+	function loadMetaStats(clients) {
+		metaStatsByClient = {};
+		lastSyncByClient = {};
+		if (!clients.length) return Promise.resolve();
+
+		return Promise.all([
+			supabase.rpc("client_period_totals", { _days: 7 }),
+			supabase.rpc("client_period_totals", { _days: 30 }),
+			supabase.from("v_client_accounts").select("client_id,account_id"),
+		]).then(function (results) {
+			var res7 = results[0], res30 = results[1], resAccounts = results[2];
+
+			function addRows(rows, windowDays) {
+				(rows || []).forEach(function (row) {
+					var s = metaStatsByClient[row.client_id] || { 7: [], 30: [] };
+					s[windowDays].push(row);
+					metaStatsByClient[row.client_id] = s;
+				});
+			}
+			addRows(res7.data, 7);
+			addRows(res30.data, 30);
+
+			var accountRows = resAccounts.data || [];
+			var clientByAccount = {};
+			accountRows.forEach(function (r) { clientByAccount[r.account_id] = r.client_id; });
+			var accountIds = Object.keys(clientByAccount);
+			if (!accountIds.length) return;
+
+			return supabase.from("ad_accounts").select("account_id,last_synced_at,last_probe_at").in("account_id", accountIds)
+				.then(function (resAcc) {
+					(resAcc.data || []).forEach(function (a) {
+						var clientId = clientByAccount[a.account_id];
+						if (!clientId) return;
+						var cur = lastSyncByClient[clientId] || { lastSyncedAt: null, lastProbeAt: null };
+						if (a.last_synced_at && (!cur.lastSyncedAt || a.last_synced_at > cur.lastSyncedAt)) cur.lastSyncedAt = a.last_synced_at;
+						if (a.last_probe_at && (!cur.lastProbeAt || a.last_probe_at > cur.lastProbeAt)) cur.lastProbeAt = a.last_probe_at;
+						lastSyncByClient[clientId] = cur;
+					});
+				});
+		});
+	}
+
 	function loadClients() {
 		showOnly($loading);
 		return supabase
@@ -229,7 +331,7 @@
 					return;
 				}
 				allClients = res.data || [];
-				return Promise.resolve(loadStats(allClients)).then(function () {
+				return Promise.all([loadStats(allClients), loadMetaStats(allClients)]).then(function () {
 					renderSummary(allClients);
 					applyFilter();
 				});
@@ -309,6 +411,14 @@
 	$("#logoutLink").on("click", function (e) {
 		e.preventDefault();
 		AuditClient.signOut();
+	});
+	// Los 2 rangos ya están en memoria (loadMetaStats pidió 7 y 30 juntos) —
+	// cambiar la ventana solo re-pinta, nunca vuelve a llamar al RPC.
+	$("#clientsWindowToggle").on("click", ".window-btn", function () {
+		currentWindow = Number($(this).data("days"));
+		$("#clientsWindowToggle .window-btn").removeClass("active");
+		$(this).addClass("active");
+		applyFilter();
 	});
 
 	// --- Arranque: sólo cargar si hay sesión ---

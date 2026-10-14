@@ -1099,6 +1099,16 @@
 					</div>
 				</div>
 
+				<!-- Ventana de datos reales de Meta (Paso 4): nunca se refetchea al
+				     cambiar, los 2 rangos ya están en memoria (client_period_totals). -->
+				<div class="d-flex justify-content-end align-items-center mb-2">
+					<span class="fs-13 text-muted me-2">Datos de Meta:</span>
+					<div class="btn-group btn-group-sm" role="group" id="clientsWindowToggle">
+						<button type="button" class="btn btn-outline-primary window-btn" data-days="7">7 días</button>
+						<button type="button" class="btn btn-outline-primary window-btn active" data-days="30">30 días</button>
+					</div>
+				</div>
+
 				<!-- Grid de clientes -->
 				<div id="clientsGrid" class="row d-none"></div>
 
