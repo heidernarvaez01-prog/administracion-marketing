@@ -98,6 +98,27 @@ ver un push. Para que un cambio en `supabase/functions/*/index.ts` quede realmen
 - **Cron diario ACTIVO** (`sync-meta-datos-daily`, `supabase/manual/sync_meta_datos_cron.sql` corrido, 08:00 UTC vía `pg_net`, secreto leído de Vault).
   Prueba manual verificada: `202`, ~55 s, 4 cuentas completas ok, 3 dormidas sondeadas, candado liberado al terminar.
 
+## Estado actual de la interfaz Eclan (2026-10-14)
+- **Menú por rol en las 13 páginas de producto** (index, compaign, analytics, clientes, alertas, brief, clusters, reporte-semanal, preguntar-ia,
+  calendario, admin, auditoria, seleccionar-cliente): viewer/manager solo ven Dashboard/Clientes/Analytics/Campañas en el menú; el resto
+  (Administración, Alertas, Brief, Clusters, Reporte semanal, Preguntar IA, Calendario, Auditoría, Seleccionar cliente) queda oculto por
+  `data-require-role="admin"` (cosmético, vía `role-ui.js`) y además protegido por `<body data-page-access="admin">`: un no-admin que entre por
+  URL directa a esas páginas es redirigido a `index.html`. La seguridad real sigue siendo la migración de RLS de abajo, ya aplicada.
+- **RLS: solo admin escribe en herramientas de la plataforma** (ya aplicado en la base y versionado en
+  `supabase/manual/20261014000500_admin_only_platform_tools.sql`): viewer/manager ya no pueden insertar/editar/borrar en `alert_rules`,
+  `audit_records`, `brand_briefs`, `cluster_runs`, `notification_channels`, `weekly_reports`, `audit_clients`, etc. La lectura no cambió.
+- **`index.html` es ahora el Dashboard real del producto** (antes era la plantilla de relleno de Eclan, oculta del menú de las demás páginas):
+  login real, selector de cliente arriba (admin/manager con "Todos"; el viewer no lo ve) + selector de período 7/30/90 global. Mapeo de
+  tarjetas: campañas del período y top-campañas-por-gasto desde `meta_campaign_totals` (vía `windsor-metrics`); gasto/clics por día y gasto de
+  hoy/ayer (con fecha real, nunca "Hoy"/"Ayer") desde `meta_daily_totals`; audiencia/leads/conversaciones desde `client_period_totals` directo
+  (se suman entre monedas, a diferencia del gasto). `analytics.html`/`compaign.html` quedan como páginas secundarias. Script nuevo:
+  `js/dashboard/dashboard-home.js`.
+- **`clientes.html`**: el resumen de arriba (Clientes/Gasto por moneda/Leads/Conversaciones) ahora lee `client_period_totals` (ya en memoria,
+  respeta el toggle 7/30 días), no la auditoría manual (`audit_records`) — antes salía en 0 si nadie había cargado un presupuesto a mano. Se
+  quitaron "Campañas auditadas"/"Presupuesto total"/"En riesgo" (no existen en `client_period_totals`) y el banner de alertas críticas.
+- **Regla de monedas aplicada en todo lo anterior**: impresiones, clics, leads y conversaciones se suman entre monedas (no son dinero); gasto,
+  CPC y costo por lead/conversación nunca — van en un bloque (o selector) por moneda.
+
 ## Pendiente, en este orden
 1. Primer cliente con acceso: Ginecea (decidido, hecho). Moneda: control para elegir `ad_accounts.currency` por cuenta, **dentro de Eclan**
    (pantalla "Clientes y Agencias" del paso 4 — no en React). Por ahora **no** se agrega columna de tasa de cambio ni UI para ella.
