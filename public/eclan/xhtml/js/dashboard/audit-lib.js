@@ -153,6 +153,7 @@
 				metrics: metrics,
 				alerts: alerts,
 				campaignRows: campaignRows,
+				platform: campaignRows.length ? campaignRows[0].datasource : undefined,
 			});
 		});
 	}

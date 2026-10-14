@@ -28,6 +28,7 @@
 	<link rel="stylesheet" href="vendor/chartist/css/chartist.min.css">
     <link href="vendor/bootstrap-select/dist/css/bootstrap-select.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
+    <link href="css/audit-extras.css" rel="stylesheet">
 	<link href="https://cdn.lineicons.com/2.0/LineIcons.css" rel="stylesheet">
 
 </head>
@@ -1040,13 +1041,22 @@
 					<!-- Tabla de auditorías -->
 					<div class="card" id="auditTableCard">
 						<div class="table-responsive">
-							<table class="table table-striped mb-0" id="auditTable">
+							<table class="table table-striped mb-0 audit-table" id="auditTable">
 								<thead>
 									<tr>
+										<th style="width:28px;"></th>
+										<th>Plataforma</th>
 										<th>Campaña</th>
+										<th>Cuenta</th>
+										<th>Fecha inicio</th>
+										<th>Fecha fin</th>
+										<th>Cronograma</th>
 										<th>Presupuesto</th>
-										<th>Gasto</th>
-										<th style="min-width:160px;">Ritmo (tiempo vs. gasto)</th>
+										<th>Gasto actual</th>
+										<th>% Esperado</th>
+										<th>% Actual</th>
+										<th>Ideal diario</th>
+										<th>Restante</th>
 										<th>Estado</th>
 										<th>Alertas</th>
 										<th></th>
@@ -1171,6 +1181,7 @@
 	<!-- Ad-Audit-Platform: login + gestión de clientes real contra Supabase -->
 	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 	<script src="js/dashboard/supabase-client.js"></script>
+	<script src="vendor/apexchart/apexchart.js"></script>
 	<script src="js/dashboard/windsor-client.js"></script>
 	<script src="js/dashboard/audit-lib.js"></script>
 	<script src="js/dashboard/auditoria.js"></script>

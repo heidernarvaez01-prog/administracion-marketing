@@ -19,6 +19,7 @@ const WINDSOR_FIELDS = [
   "clicks",
   "spend",
   "impressions",
+  "reach",
   "cpc",
   "cpm",
   "objective",
@@ -40,6 +41,7 @@ interface WindsorRow {
   clicks?: number;
   spend?: number;
   impressions?: number;
+  reach?: number;
   cpc?: number;
   cpm?: number;
   objective?: string;
@@ -339,14 +341,14 @@ serve(async (req) => {
     // ------------------------------------------------------------------
     let dailyCampaignTotals: {
       date: string; campaign: string; datasource: string;
-      clicks: number; spend: number; impressions: number;
+      clicks: number; spend: number; impressions: number; reach: number;
     }[] | undefined;
     let campaignNames: string[] | undefined;
 
     if (includeRaw) {
       const porFechaCampaña = new Map<
         string,
-        { date: string; campaign: string; datasource: string; clicks: number; spend: number; impressions: number }
+        { date: string; campaign: string; datasource: string; clicks: number; spend: number; impressions: number; reach: number }
       >();
       for (const r of rows) {
         if (!r.campaign || !r.date) continue;
@@ -358,14 +360,16 @@ serve(async (req) => {
           clicks: 0,
           spend: 0,
           impressions: 0,
+          reach: 0,
         };
         acc.clicks += num(r.clicks);
         acc.spend += num(r.spend);
         acc.impressions += num(r.impressions);
+        acc.reach += num(r.reach);
         porFechaCampaña.set(key, acc);
       }
       dailyCampaignTotals = Array.from(porFechaCampaña.values())
-        .map((r) => ({ ...r, clicks: round(r.clicks, 0), spend: round(r.spend, 2), impressions: round(r.impressions, 0) }))
+        .map((r) => ({ ...r, clicks: round(r.clicks, 0), spend: round(r.spend, 2), impressions: round(r.impressions, 0), reach: round(r.reach, 0) }))
         .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       campaignNames = Array.from(new Set(rows.map((r) => r.campaign).filter(Boolean))).sort() as string[];
     }
