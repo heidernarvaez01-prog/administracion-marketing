@@ -13,6 +13,13 @@
 (function (window) {
 	"use strict";
 
+	// El plugin bootstrap-select no existe en vendor/ (404). custom.min.js lo
+	// llama en document.ready y la excepción corta el resto de handlers de
+	// "load" (analytics.js / compaign.js nunca arrancaban). Stub no-op.
+	if (window.jQuery && !window.jQuery.fn.selectpicker) {
+		window.jQuery.fn.selectpicker = function () { return this; };
+	}
+
 	if (!window.supabase || !window.supabase.createClient) {
 		console.error("supabase-client.js: falta cargar el UMD de @supabase/supabase-js antes de este script.");
 		return;
