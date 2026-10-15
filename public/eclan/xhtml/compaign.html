@@ -979,70 +979,43 @@
             <!-- row -->
 			<div class="container-fluid">
 				<div class="form-head d-flex mb-0 mb-lg-4 align-items-start">
-					<div class="me-auto d-none d-lg-block">
-						<h2 class="text-black font-w600">Campaign</h2>
-						<p class="mb-0">Current campaign list</p>
+					<div class="me-auto">
+						<h2 class="text-black font-w600">Campañas</h2>
+						<p class="mb-0" id="campaignSubtitle">Cargando campañas…</p>
 					</div>
-					<div class="d-none d-lg-flex align-items-center">
+					<div class="d-flex align-items-center">
 						<div class="text-end">
-							<h3 class="fs-20 text-black mb-0">09:30 AM</h3>
-							<span class="fs-14">Monday, 3 Augusut 2023</span>
+							<h3 class="fs-20 text-black mb-0" id="campaignHeaderTime">—</h3>
+							<span class="fs-14" id="campaignHeaderDate">—</span>
 						</div>
-						<a class="ms-4 text-black p-3 rounded border text-center width60" href="#">
-							<i class="las la-cog scale5"></i>
+						<a class="ms-4 text-black p-3 rounded border text-center width60" href="javascript:void(0);" id="campaignReload" title="Actualizar datos">
+							<i class="las la-sync scale5"></i>
 						</a>
 					</div>
-				</div>	
+				</div>
                 <div class="row">
 					<div class="col-xl-12">
-						<div class="d-lg-flex d-block ps-0 pe-0 border-0 align-items-end justify-content-between mb-3">
-							<div class="">
-								<a href="javascript:void(0);" class="btn bg-white mb-2 me-2">
-									<svg class="me-2 scale5" width="14" height="14" viewBox="0 0 18 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-										<path d="M17.9375 4.6875V22.5625C17.9378 22.7117 17.897 22.8581 17.8196 22.9857C17.7422 23.1132 17.6312 23.217 17.4987 23.2856C17.3831 23.3449 17.2549 23.3755 17.125 23.375C16.9593 23.3746 16.7977 23.3236 16.6619 23.2288L9 17.8662L1.33813 23.2288C1.21968 23.3089 1.08218 23.3564 0.939516 23.3664C0.796853 23.3763 0.65408 23.3485 0.525625 23.2856C0.388595 23.2204 0.272581 23.118 0.190727 22.9902C0.108873 22.8624 0.064453 22.7143 0.0625 22.5625V4.6875C0.0625 3.61006 0.490512 2.57675 1.25238 1.81488C2.01425 1.05301 3.04756 0.625 4.125 0.625H13.875C14.9524 0.625 15.9858 1.05301 16.7476 1.81488C17.5095 2.57675 17.9375 3.61006 17.9375 4.6875Z" fill="#353751"/>
-									</svg>
-									<span class="text-black">Boookmark</span>
-								</a>
-								<a href="javascript:void(0);" class="btn bg-white mb-2 me-2">
-									<svg class="me-2 scale5"  width="14" height="14" viewBox="0 0 23 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-										<path d="M9.72803 10.4999L9.72796 3.1005C9.72795 1.31868 11.8822 0.426337 13.1422 1.68627L21.0416 9.58573C21.8227 10.3668 21.8227 11.6331 21.0416 12.4142L13.1422 20.3136C11.8822 21.5735 9.72795 20.6812 9.72796 18.8994L9.72803 10.4999Z" fill="#52B141"/>
-									</svg>
-									<span class="text-black">Start</span>
-								</a>
-								<a href="javascript:void(0);" class="btn bg-white mb-2 me-2">
-									<svg class="me-2 scale5 scale5" width="14" height="14" viewBox="0 0 12 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-										<path d="M8 1C8 0.447716 8.44772 0 9 0H11C11.5523 0 12 0.447715 12 1V17C12 17.5523 11.5523 18 11 18H9C8.44772 18 8 17.5523 8 17V1Z" fill="#8E8E8E"/>
-										<path d="M0 1C0 0.447716 0.447715 0 1 0H3C3.55228 0 4 0.447715 4 1V17C4 17.5523 3.55228 18 3 18H1C0.447715 18 0 17.5523 0 17V1Z" fill="#8E8E8E"/>
-									</svg>
-									<span class="text-black">Pause</span>
-								</a>
-								<a href="javascript:void(0);" class="btn bg-white mb-2 me-2">
-									<svg  class="me-2 scale5" width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-										<rect width="14" height="14" rx="2" fill="#F83737"/>
-									</svg>
-									<span class="text-black">Stop</span>
-								</a>
-							</div>
-							<div>
-								<a href="javascript:void(0);" class="btn bg-white mb-2 me-2">
-									<svg width="14" height="14" class="scale5" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-										<path d="M19 2.25H8.5C8.5 1.42275 7.82725 0.75 7 0.75H5.5C4.67275 0.75 4 1.42275 4 2.25H1C0.586 2.25 0.25 2.58525 0.25 3C0.25 3.41475 0.586 3.75 1 3.75H4C4 4.57725 4.67275 5.25 5.5 5.25H7C7.82725 5.25 8.5 4.57725 8.5 3.75H19C19.414 3.75 19.75 3.41475 19.75 3C19.75 2.58525 19.414 2.25 19 2.25ZM5.5 3.75V2.25H7L7.00075 2.997C7.00075 2.9985 7 2.99925 7 3C7 3.00075 7.00075 3.0015 7.00075 3.003V3.75H5.5Z" fill="#2E2E2E"/>
-										<path d="M19 8.25H14.5C14.5 7.42275 13.8273 6.75 13 6.75H11.5C10.6727 6.75 10 7.42275 10 8.25H1C0.586 8.25 0.25 8.58525 0.25 9C0.25 9.41475 0.586 9.75 1 9.75H10C10 10.5773 10.6727 11.25 11.5 11.25H13C13.8273 11.25 14.5 10.5773 14.5 9.75H19C19.414 9.75 19.75 9.41475 19.75 9C19.75 8.58525 19.414 8.25 19 8.25ZM11.5 9.75V8.25H13L13.0007 8.997C13.0007 8.9985 13 8.99925 13 9C13 9.00075 13.0007 9.0015 13.0007 9.003V9.75H11.5Z" fill="#2E2E2E"/>
-										<path d="M19 14.25H8.5C8.5 13.4227 7.82725 12.75 7 12.75H5.5C4.67275 12.75 4 13.4227 4 14.25H1C0.586 14.25 0.25 14.5853 0.25 15C0.25 15.4148 0.586 15.75 1 15.75H4C4 16.5773 4.67275 17.25 5.5 17.25H7C7.82725 17.25 8.5 16.5773 8.5 15.75H19C19.414 15.75 19.75 15.4148 19.75 15C19.75 14.5853 19.414 14.25 19 14.25ZM5.5 15.75V14.25H7L7.00075 14.997C7.00075 14.9985 7 14.9992 7 15C7 15.0008 7.00075 15.0015 7.00075 15.003V15.75H5.5Z" fill="#2E2E2E"/>
-									</svg>
-								</a>
-								<div class="dropdown custom-dropdown mb-2">
-									<div class="btn bg-white d-flex align-items-center" data-bs-toggle="dropdown">
-										<div class="text-start me-3">
-											<span class="text-black">Newest</span>
-										</div>
-										<i class="fa fa-caret-down text-black" aria-hidden="true"></i>
-									</div>
-									<div class="dropdown-menu dropdown-menu-right">
-										<a class="dropdown-item" href="javascript:void(0);">4 June 2020 - 4 July 2020</a>
-										<a class="dropdown-item" href="javascript:void(0);">5 july 2020 - 4 Aug 2020</a>
-									</div>
+						<div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+							<div class="d-flex flex-wrap gap-2 align-items-center">
+								<select id="campaignClientSelect" class="form-select form-select-sm d-none" style="width:auto;min-width:200px;"></select>
+								<div class="btn-group" role="group" id="campaignRangeGroup">
+									<button type="button" class="btn btn-sm bg-white" data-preset="last_7d">7 días</button>
+									<button type="button" class="btn btn-sm bg-white" data-preset="last_30d">30 días</button>
+									<button type="button" class="btn btn-sm btn-primary" data-preset="last_90d">90 días</button>
 								</div>
+							</div>
+							<div class="d-flex flex-wrap gap-2 align-items-center">
+								<div class="btn-group" role="group" id="campaignStatusGroup">
+									<button type="button" class="btn btn-sm btn-primary" data-status="all">Todas</button>
+									<button type="button" class="btn btn-sm bg-white" data-status="On Going">Activas</button>
+									<button type="button" class="btn btn-sm bg-white" data-status="Expired">Sin gasto reciente</button>
+								</div>
+								<select id="campaignSortSelect" class="form-select form-select-sm" style="width:auto;">
+									<option value="spend">Mayor gasto</option>
+									<option value="clicks">Más clics</option>
+									<option value="ctr">Mejor CTR</option>
+									<option value="lastDate">Actividad más reciente</option>
+								</select>
 							</div>
 						</div>
 					</div>
