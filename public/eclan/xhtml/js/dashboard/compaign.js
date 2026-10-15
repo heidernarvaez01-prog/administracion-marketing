@@ -61,23 +61,30 @@
 		row.querySelector(".donut-chart-sale small").textContent = c.ctr.toFixed(2) + "% CTR";
 		row.querySelector(".media-body p").textContent = c.datasource;
 		row.querySelector(".media-body h3 a").textContent = c.campaign;
-		row.querySelector(".media-body > span").textContent = "Última actividad: " + c.lastDate;
-		row.querySelector(".cl-btn").textContent = c.status;
+		var extra = [];
+		if (c.clientName) extra.push(c.clientName);
+		if (c.leads) extra.push(WindsorClient.compact(c.leads) + " leads");
+		if (c.conversations) extra.push(WindsorClient.compact(c.conversations) + " conversaciones");
+		extra.push("Última actividad: " + WindsorClient.shortDate(c.lastDate));
+		row.querySelector(".media-body > span").textContent = extra.join(" · ");
+		row.querySelector(".cl-btn").textContent = c.status === "On Going" ? "Activa" : "Sin gasto reciente";
 		return row;
 	}
 
+	var CLIENT_KEY = "apache360.selectedClientId";
 	var selectedCurrency = null;
+	var currentPreset = "last_90d";
+	var statusFilter = "all";
+	var sortKey = "spend";
+	var selectedClientId = "";
+	try { selectedClientId = localStorage.getItem(CLIENT_KEY) || ""; } catch (e) {}
+	var clientNames = {};
+	var lastData = null;
 
-	// Nunca se oculta en silencio que hay más de una moneda: si currencies
-	// trae más de una, se muestra un selector (en vez de mezclar montos de
-	// MXN y USD en una sola lista).
 	function renderCurrencyBar(data) {
 		var $bar = $("#campaignCurrencyBar");
 		var $select = $("#campaignCurrencySelect");
-		if (!data.currencies || data.currencies.length < 2) {
-			$bar.addClass("d-none");
-			return;
-		}
+		if (!data.currencies || data.currencies.length < 2) { $bar.addClass("d-none"); return; }
 		$select.empty();
 		data.currencies.forEach(function (cur) {
 			$select.append($("<option>", { value: cur, text: cur, selected: cur === data.currency }));
@@ -85,51 +92,93 @@
 		$bar.removeClass("d-none");
 	}
 
-	function loadCampaigns() {
-		var $container = $("#campaignList");
-		if ($container.length === 0 || typeof WindsorClient === "undefined" || typeof AuditClient === "undefined") return;
-
-		AuditClient.requireAuth().then(function (session) {
-			if (!session) return; // ya redirigió a page-login.html
-
-			WindsorClient.fetchMetrics({ datePreset: "last_90d", currency: selectedCurrency })
-				.then(function (data) {
-					selectedCurrency = data.currency;
-					renderCurrencyBar(data);
-
-					if (!data.campaigns || !data.campaigns.length) {
-						$container.empty().append(
-							$("<p>", { class: "text-muted p-4 mb-0", text: "No hay campañas en el rango consultado." })
-						);
-						return;
-					}
-
-					$container.empty();
-					data.campaigns.forEach(function (c) { $container.append(renderCampaignRow(c, data.currency)); });
-
-					// Peity escanea el DOM al llamarse; hay que reinicializar
-					// después de inyectar los nuevos ".donut".
-					$("#campaignList span.donut").peity("donut", { width: "80", height: "80" });
-				})
-				.catch(function (err) {
-					console.error("windsor-metrics:", err);
-					$container.empty().append(
-						$("<div>", { class: "alert alert-danger m-3" }).text(
-							"No se pudieron cargar las campañas de Windsor.ai" +
-								(err && err.status ? " (HTTP " + err.status + ")" : "") +
-								": " +
-								(err && err.message ? err.message : "error desconocido")
-						)
-					);
-				});
+	function loadClients() {
+		return AuditClient.supabase.from("audit_clients").select("id,name").order("name").then(function (res) {
+			var list = res.data || [];
+			list.forEach(function (c) { clientNames[c.id] = c.name; });
+			if (selectedClientId && !clientNames[selectedClientId]) selectedClientId = "";
+			var $sel = $("#campaignClientSelect");
+			if (list.length < 2) { $sel.addClass("d-none"); return; }
+			$sel.empty().append($("<option>", { value: "", text: "Todos los clientes" }));
+			list.forEach(function (c) { $sel.append($("<option>", { value: c.id, text: c.name })); });
+			$sel.val(selectedClientId).removeClass("d-none");
 		});
 	}
 
-	jQuery(window).on("load", function () {
-		$(document).on("change", "#campaignCurrencySelect", function () {
-			selectedCurrency = $(this).val();
-			loadCampaigns();
+	function renderList() {
+		var $container = $("#campaignList");
+		var data = lastData;
+		if (!data) return;
+		var rows = (data.campaigns || []).map(function (c) {
+			return $.extend({}, c, { clientName: selectedClientId ? "" : clientNames[c.clientId] || "" });
+		}).filter(function (c) { return statusFilter === "all" || c.status === statusFilter; });
+		rows.sort(function (a, b) {
+			if (sortKey === "lastDate") return a.lastDate < b.lastDate ? 1 : -1;
+			return (b[sortKey] || 0) - (a[sortKey] || 0);
 		});
-		setTimeout(loadCampaigns, 300);
+		$container.empty();
+		if (!rows.length) {
+			$container.append($("<p>", { class: "text-muted p-4 mb-0", text: "No hay campañas con este filtro en el período." }));
+			return;
+		}
+		rows.forEach(function (c) { $container.append(renderCampaignRow(c, data.currency)); });
+		$("#campaignList span.donut").peity("donut", { width: "80", height: "80" });
+	}
+
+	function loadCampaigns() {
+		var $container = $("#campaignList");
+		if ($container.length === 0 || typeof WindsorClient === "undefined" || typeof AuditClient === "undefined") return;
+		$("#campaignSubtitle").text("Cargando campañas…");
+
+		WindsorClient.fetchMetrics({ datePreset: currentPreset, currency: selectedCurrency, clientId: selectedClientId || undefined })
+			.then(function (data) {
+				lastData = data;
+				selectedCurrency = data.currency;
+				renderCurrencyBar(data);
+				var labels = (data.clickSummary && data.clickSummary.labels) || [];
+				var rango = labels.length ? WindsorClient.longDate(labels[0]) + " – " + WindsorClient.longDate(labels[labels.length - 1]) : "sin datos en el período";
+				$("#campaignSubtitle").text((data.campaigns || []).length + " campañas · " + rango);
+				var g = new Date(data.generatedAt || Date.now());
+				$("#campaignHeaderTime").text(g.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }));
+				$("#campaignHeaderDate").text("Actualizado " + g.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }));
+				renderList();
+			})
+			.catch(function (err) {
+				console.error("windsor-metrics:", err);
+				$("#campaignSubtitle").text("No se pudieron cargar las campañas");
+				$container.empty().append(
+					$("<div>", { class: "alert alert-danger m-3" }).text(
+						"No se pudieron cargar las campañas" + (err && err.status ? " (HTTP " + err.status + ")" : "") + ": " + (err && err.message ? err.message : "error desconocido")
+					)
+				);
+			});
+	}
+
+	function setActive(groupSel, attr, value) {
+		$(groupSel + " button").removeClass("btn-primary").addClass("bg-white");
+		$(groupSel + " button[data-" + attr + '="' + value + '"]').removeClass("bg-white").addClass("btn-primary");
+	}
+
+	$(document).on("change", "#campaignCurrencySelect", function () { selectedCurrency = $(this).val(); loadCampaigns(); });
+	$(document).on("change", "#campaignClientSelect", function () {
+		selectedClientId = $(this).val();
+		try { localStorage.setItem(CLIENT_KEY, selectedClientId); } catch (e) {}
+		selectedCurrency = null;
+		loadCampaigns();
 	});
+	$(document).on("click", "#campaignRangeGroup button", function () {
+		currentPreset = $(this).data("preset"); setActive("#campaignRangeGroup", "preset", currentPreset); loadCampaigns();
+	});
+	$(document).on("click", "#campaignStatusGroup button", function () {
+		statusFilter = $(this).data("status"); setActive("#campaignStatusGroup", "status", statusFilter); renderList();
+	});
+	$(document).on("change", "#campaignSortSelect", function () { sortKey = $(this).val(); renderList(); });
+	$(document).on("click", "#campaignReload", function () { loadCampaigns(); });
+
+	if (typeof AuditClient !== "undefined") {
+		AuditClient.requireAuth().then(function (session) {
+			if (!session) return;
+			loadClients().then(loadCampaigns, loadCampaigns);
+		});
+	}
 })(jQuery);
