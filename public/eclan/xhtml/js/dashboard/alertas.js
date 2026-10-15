@@ -303,6 +303,12 @@
 		var scope = thresholdsAndEnabled();
 		return supabase.from("audit_clients").select("id, name").then(function (clientsRes) {
 			var clients = clientsRes.data || [];
+			// Respeta el cliente elegido en el Dashboard (o ?client_id= en la URL).
+			var chosen = new URLSearchParams(window.location.search).get("client_id");
+			if (!chosen) { try { chosen = localStorage.getItem("apache360.selectedClientId"); } catch (e) {} }
+			if (chosen && clients.some(function (c) { return c.id === chosen; })) {
+				clients = clients.filter(function (c) { return c.id === chosen; });
+			}
 			return supabase.from("audit_records").select("*").then(function (recordsRes) {
 				var records = recordsRes.data || [];
 				// windsor-metrics?raw=1 exige client_id: se pide un detalle por cliente.

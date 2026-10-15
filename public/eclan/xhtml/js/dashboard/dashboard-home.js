@@ -25,7 +25,10 @@
 	var allClients = [];
 	var currentPreset = "last_90d";
 	var selectedCurrency = null;
+	// Cliente elegido, compartido con otras páginas (p.ej. alertas.html).
+	var CLIENT_KEY = "apache360.selectedClientId";
 	var selectedClientId = "";
+	try { selectedClientId = localStorage.getItem(CLIENT_KEY) || ""; } catch (e) {}
 	var apexInstances = {};
 
 	function daysFromPreset(preset) {
@@ -380,6 +383,8 @@
 			allClients.forEach(function (c) {
 				$clientSelect.append($("<option>", { value: c.id, text: c.name }));
 			});
+			if (selectedClientId && !allClients.some(function (c) { return c.id === selectedClientId; })) selectedClientId = "";
+			$clientSelect.val(selectedClientId);
 			$clientSelect.removeClass("d-none");
 		});
 	}
@@ -396,6 +401,7 @@
 
 	$(document).on("change", "#homeClientSelect", function () {
 		selectedClientId = $(this).val();
+		try { localStorage.setItem(CLIENT_KEY, selectedClientId); } catch (e) {}
 		loadDashboard();
 	});
 
