@@ -1,0 +1,1 @@
+- AI calls in edge functions go through `_shared/openai.ts` `resolveAiEndpoint`: OpenAI if `OPENAI_API_KEY` exists, otherwise Lovable AI Gateway with `LOVABLE_API_KEY` — so AI features work without an extra secret.
