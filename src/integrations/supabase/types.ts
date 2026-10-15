@@ -1036,6 +1036,25 @@ export type Database = {
       }
       is_client_member: { Args: { _client_id: string }; Returns: boolean }
       is_client_owner: { Args: { _client_id: string }; Returns: boolean }
+      meta_ad_totals: {
+        Args: { _client_id?: string; _days?: number }
+        Returns: {
+          account_id: string
+          ad_id: string
+          ad_name: string
+          campaign_name: string
+          clicks: number
+          client_id: string
+          currency: string
+          impressions: number
+          last_fecha: string
+          leads: number
+          messaging_conversations: number
+          spend: number
+          spend_prior: number
+          spend_recent: number
+        }[]
+      }
       meta_campaign_totals: {
         Args: { _client_id?: string; _days?: number }
         Returns: {
@@ -1062,6 +1081,16 @@ export type Database = {
           impressions: number
           leads: number
           messaging_conversations: number
+          spend: number
+        }[]
+      }
+      meta_objective_totals: {
+        Args: { _client_id?: string; _days?: number }
+        Returns: {
+          clicks: number
+          currency: string
+          impressions: number
+          objective: string
           spend: number
         }[]
       }
