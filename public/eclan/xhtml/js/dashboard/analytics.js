@@ -117,6 +117,8 @@
 		$("#kpiTotalImpressions").text(WindsorClient.compact(data.kpis.totalImpressions));
 		$("#kpiSpendYesterday").text(WindsorClient.money(data.kpis.spendYesterday, data.currency));
 		$("#kpiSpendToday").text(WindsorClient.money(data.kpis.spendToday, data.currency));
+		if (data.lastFecha) $("#kpiSpendTodayLabel").text("Gasto · " + WindsorClient.shortDate(data.lastFecha));
+		if (data.prevFecha) $("#kpiSpendYesterdayLabel").text("Gasto · " + WindsorClient.shortDate(data.prevFecha));
 		$("#kpiClickSummaryTotal").text(WindsorClient.compact(data.kpis.totalClicks));
 		$("#kpiSpendSummaryTotal").text(WindsorClient.money(data.kpis.totalSpend, data.currency));
 
@@ -348,7 +350,9 @@
 
 		AuditClient.requireAuth().then(function (session) {
 			if (!session) return null; // ya redirigió a page-login.html
-			return WindsorClient.fetchMetrics({ datePreset: currentPreset, currency: selectedCurrency });
+			var cid = "";
+			try { cid = localStorage.getItem("apache360.selectedClientId") || ""; } catch (e) {}
+			return WindsorClient.fetchMetrics({ datePreset: currentPreset, currency: selectedCurrency, clientId: cid || undefined });
 		}).then(function (data) {
 			if (!data) return;
 			lastData = data;
@@ -359,10 +363,11 @@
 			lineChart("activity", data.clickSummary.labels, data.clickSummary.data, "rgb(82, 177, 65)", "Clics", false);
 			lineChart("activity2", data.spendSummary.labels, data.spendSummary.data, "rgb(236, 72, 153)", "Gasto", true, data.currency);
 			renderGoalStatistic(data.objectiveBreakdown, data.ctrGauge);
-			renderPlatformBreakdown(data.plataformas);
+			if (data.plataformas && data.plataformas.length) renderPlatformBreakdown(data.plataformas);
+			else $("#platformBreakdownList").addClass("d-none");
 			renderEngagementChart(data.engagementByPlatform);
-			renderAdList("#mostPerformedAdsList", data.topAds.slice(0, 3), "Clics", data.currency);
-			renderAdList("#trendingAdsList", data.topAds.slice(0, 3).reverse(), "Clics", data.currency);
+			renderAdList("#mostPerformedAdsList", data.topAds.slice(0, 5), "Clics", data.currency);
+			renderAdList("#trendingAdsList", (data.trendingAds || []).slice(0, 5), "Clics", data.currency);
 		}).catch(function (err) {
 			setLoading(false);
 			console.error("windsor-metrics:", err);
