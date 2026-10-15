@@ -578,6 +578,39 @@ export type Database = {
           },
         ]
       }
+      meta_ad_creatives: {
+        Row: {
+          account_id: string
+          ad_id: string
+          body: string | null
+          image_url: string | null
+          link_url: string | null
+          thumbnail_url: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          ad_id: string
+          body?: string | null
+          image_url?: string | null
+          link_url?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          ad_id?: string
+          body?: string | null
+          image_url?: string | null
+          link_url?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       meta_datos: {
         Row: {
           account_id: string | null
@@ -632,6 +665,10 @@ export type Database = {
           total_cost: number | null
           unique_clicks: number | null
           unique_ctr: number | null
+          video_p100: number | null
+          video_p25: number | null
+          video_p50: number | null
+          video_p75: number | null
           website_purchase_roas: number | null
         }
         Insert: {
@@ -687,6 +724,10 @@ export type Database = {
           total_cost?: number | null
           unique_clicks?: number | null
           unique_ctr?: number | null
+          video_p100?: number | null
+          video_p25?: number | null
+          video_p50?: number | null
+          video_p75?: number | null
           website_purchase_roas?: number | null
         }
         Update: {
@@ -742,7 +783,146 @@ export type Database = {
           total_cost?: number | null
           unique_clicks?: number | null
           unique_ctr?: number | null
+          video_p100?: number | null
+          video_p25?: number | null
+          video_p50?: number | null
+          video_p75?: number | null
           website_purchase_roas?: number | null
+        }
+        Relationships: []
+      }
+      meta_demographics_daily: {
+        Row: {
+          account_id: string
+          age: string
+          campaign_id: string
+          clicks: number
+          fecha: string
+          gender: string
+          impressions: number
+          leads: number
+          messaging_conversations: number
+          reach: number
+          spend: number
+          synced_at: string
+        }
+        Insert: {
+          account_id: string
+          age?: string
+          campaign_id?: string
+          clicks?: number
+          fecha: string
+          gender?: string
+          impressions?: number
+          leads?: number
+          messaging_conversations?: number
+          reach?: number
+          spend?: number
+          synced_at?: string
+        }
+        Update: {
+          account_id?: string
+          age?: string
+          campaign_id?: string
+          clicks?: number
+          fecha?: string
+          gender?: string
+          impressions?: number
+          leads?: number
+          messaging_conversations?: number
+          reach?: number
+          spend?: number
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      meta_geo_daily: {
+        Row: {
+          account_id: string
+          campaign_id: string
+          clicks: number
+          country: string
+          fecha: string
+          impressions: number
+          leads: number
+          messaging_conversations: number
+          reach: number
+          region: string
+          spend: number
+          synced_at: string
+        }
+        Insert: {
+          account_id: string
+          campaign_id?: string
+          clicks?: number
+          country?: string
+          fecha: string
+          impressions?: number
+          leads?: number
+          messaging_conversations?: number
+          reach?: number
+          region?: string
+          spend?: number
+          synced_at?: string
+        }
+        Update: {
+          account_id?: string
+          campaign_id?: string
+          clicks?: number
+          country?: string
+          fecha?: string
+          impressions?: number
+          leads?: number
+          messaging_conversations?: number
+          reach?: number
+          region?: string
+          spend?: number
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      meta_platform_daily: {
+        Row: {
+          account_id: string
+          campaign_id: string
+          clicks: number
+          fecha: string
+          impressions: number
+          leads: number
+          messaging_conversations: number
+          platform_position: string
+          publisher_platform: string
+          reach: number
+          spend: number
+          synced_at: string
+        }
+        Insert: {
+          account_id: string
+          campaign_id?: string
+          clicks?: number
+          fecha: string
+          impressions?: number
+          leads?: number
+          messaging_conversations?: number
+          platform_position?: string
+          publisher_platform?: string
+          reach?: number
+          spend?: number
+          synced_at?: string
+        }
+        Update: {
+          account_id?: string
+          campaign_id?: string
+          clicks?: number
+          fecha?: string
+          impressions?: number
+          leads?: number
+          messaging_conversations?: number
+          platform_position?: string
+          publisher_platform?: string
+          reach?: number
+          spend?: number
+          synced_at?: string
         }
         Relationships: []
       }
@@ -1053,6 +1233,20 @@ export type Database = {
           spend: number
           spend_prior: number
           spend_recent: number
+        }[]
+      }
+      meta_breakdown_totals: {
+        Args: { _client_id?: string; _days?: number; _kind: string }
+        Returns: {
+          clicks: number
+          currency: string
+          dim1: string
+          dim2: string
+          impressions: number
+          leads: number
+          messaging_conversations: number
+          reach: number
+          spend: number
         }[]
       }
       meta_campaign_totals: {

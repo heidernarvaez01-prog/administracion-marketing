@@ -61,7 +61,21 @@ const WINDSOR_FIELDS = [
   // null los días sin leads (se guarda 0, ver mapRow). La métrica de
   // mensajería cuenta conversaciones NUEVAS tras 7 días de inactividad.
   "actions_lead", "actions_onsite_conversion_messaging_conversation_started_7d",
+  // Embudo de video (verificado 2026-10-15: se mezcla sin 400 con omni/ranking).
+  "video_p25_watched_actions_video_view", "video_p50_watched_actions_video_view",
+  "video_p75_watched_actions_video_view", "video_p100_watched_actions_video_view",
 ].join(",");
+
+// Desgloses: Meta no permite mezclarlos entre sí ni con omni/ranking, así que
+// cada uno es una llamada aparte, a nivel campaña y día, a su propia tabla.
+const BREAKDOWN_METRICS = ["account_id", "date", "campaign_id", "spend", "impressions", "clicks", "reach",
+  "actions_lead", "actions_onsite_conversion_messaging_conversation_started_7d"];
+const BREAKDOWNS = [
+  { mode: "plataforma", table: "meta_platform_daily", dims: ["publisher_platform", "platform_position"] },
+  { mode: "demografia", table: "meta_demographics_daily", dims: ["age", "gender"] },
+  { mode: "geo", table: "meta_geo_daily", dims: ["country", "region"] },
+] as const;
+const CREATIVE_FIELDS = ["account_id", "ad_id", "thumbnail_url", "image_url", "title", "body", "link_url"].join(",");
 
 // Sondeo de cuentas dormidas: solo lo mínimo para saber si volvieron a tener actividad.
 const PROBE_FIELDS = ["account_id", "date", "spend", "impressions"].join(",");
@@ -199,6 +213,10 @@ function mapRow(r: any) {
     // "sin dato" — así se puede sumar sin filtrar nulls en cada consulta.
     leads: toInt(r["actions_lead"]) ?? 0,
     messaging_conversations: toInt(r["actions_onsite_conversion_messaging_conversation_started_7d"]) ?? 0,
+    video_p25: toInt(r["video_p25_watched_actions_video_view"]),
+    video_p50: toInt(r["video_p50_watched_actions_video_view"]),
+    video_p75: toInt(r["video_p75_watched_actions_video_view"]),
+    video_p100: toInt(r["video_p100_watched_actions_video_view"]),
   };
 }
 
@@ -233,7 +251,7 @@ function errMsg(e: unknown): string {
 
 interface RunLog {
   account_id: string;
-  mode: "completo" | "sondeo";
+  mode: "completo" | "sondeo" | "plataforma" | "demografia" | "geo" | "creativos";
   window_days: number | null;
   rows: number;
   status: "ok" | "error";
@@ -264,6 +282,79 @@ async function logRun(ctx: Ctx, e: RunLog): Promise<void> {
     if (error) console.error("sync_runs: no se pudo registrar:", sanitizeError(error.message, [ctx.apiKey]));
   } catch (err) {
     console.error("sync_runs: no se pudo registrar:", sanitizeError(errMsg(err), [ctx.apiKey]));
+  }
+}
+
+// Desgloses + creativos de UNA cuenta, tras su sync completo. Cada llamada es
+// independiente: si una falla se registra y las demás siguen.
+async function runExtras(ctx: Ctx, account: AdAccount, windowDays: number): Promise<void> {
+  const range = windsorRangeParams(windowDays, ctx.today);
+  for (const b of BREAKDOWNS) {
+    const started = new Date();
+    let n = 0;
+    try {
+      const rows = await fetchWindsor(ctx.apiKey, [account.account_id], [...BREAKDOWN_METRICS, ...b.dims].join(","), range);
+      const agg = new Map<string, Record<string, unknown>>();
+      for (const r of rows) {
+        const fecha = toDate(r["date"]);
+        if (!fecha) continue;
+        const rec: Record<string, unknown> = {
+          account_id: account.account_id, campaign_id: toStr(r["campaign_id"]) ?? "", fecha,
+          [b.dims[0]]: toStr(r[b.dims[0]]) ?? "", [b.dims[1]]: toStr(r[b.dims[1]]) ?? "",
+        };
+        const key = [rec.campaign_id, fecha, rec[b.dims[0]], rec[b.dims[1]]].join("|");
+        const cur = agg.get(key) ?? { ...rec, spend: 0, impressions: 0, clicks: 0, reach: 0, leads: 0, messaging_conversations: 0 };
+        cur.spend = (cur.spend as number) + (toNum(r["spend"]) ?? 0);
+        cur.impressions = (cur.impressions as number) + (toInt(r["impressions"]) ?? 0);
+        cur.clicks = (cur.clicks as number) + (toInt(r["clicks"]) ?? 0);
+        cur.reach = (cur.reach as number) + (toInt(r["reach"]) ?? 0);
+        cur.leads = (cur.leads as number) + (toInt(r["actions_lead"]) ?? 0);
+        cur.messaging_conversations = (cur.messaging_conversations as number) +
+          (toInt(r["actions_onsite_conversion_messaging_conversation_started_7d"]) ?? 0);
+        cur.synced_at = started.toISOString();
+        agg.set(key, cur);
+      }
+      const list = [...agg.values()];
+      const conflict = `account_id,campaign_id,fecha,${b.dims[0]},${b.dims[1]}`;
+      for (let i = 0; i < list.length; i += BATCH) {
+        const { error } = await ctx.supabase.from(b.table).upsert(list.slice(i, i + BATCH), { onConflict: conflict });
+        if (error) throw error;
+        n += Math.min(BATCH, list.length - i);
+      }
+      await logRun(ctx, { account_id: account.account_id, mode: b.mode, window_days: windowDays, rows: n,
+        status: "ok", started_at: started, finished_at: new Date() });
+    } catch (e) {
+      await logRun(ctx, { account_id: account.account_id, mode: b.mode, window_days: windowDays, rows: n,
+        status: "error", error: sanitizeError(errMsg(e), [ctx.apiKey]), started_at: started, finished_at: new Date() });
+    }
+  }
+  // Creativos: un registro por anuncio (miniatura, título, texto).
+  const started = new Date();
+  let n = 0;
+  try {
+    const rows = await fetchWindsor(ctx.apiKey, [account.account_id], CREATIVE_FIELDS, range);
+    const byAd = new Map<string, Record<string, unknown>>();
+    for (const r of rows) {
+      const ad = toStr(r["ad_id"]);
+      if (!ad) continue;
+      byAd.set(ad, {
+        ad_id: ad, account_id: account.account_id,
+        thumbnail_url: toStr(r["thumbnail_url"]), image_url: toStr(r["image_url"]),
+        title: toStr(r["title"]), body: toStr(r["body"]), link_url: toStr(r["link_url"]),
+        updated_at: started.toISOString(),
+      });
+    }
+    const list = [...byAd.values()];
+    for (let i = 0; i < list.length; i += BATCH) {
+      const { error } = await ctx.supabase.from("meta_ad_creatives").upsert(list.slice(i, i + BATCH), { onConflict: "ad_id" });
+      if (error) throw error;
+      n += Math.min(BATCH, list.length - i);
+    }
+    await logRun(ctx, { account_id: account.account_id, mode: "creativos", window_days: windowDays, rows: n,
+      status: "ok", started_at: started, finished_at: new Date() });
+  } catch (e) {
+    await logRun(ctx, { account_id: account.account_id, mode: "creativos", window_days: windowDays, rows: n,
+      status: "error", error: sanitizeError(errMsg(e), [ctx.apiKey]), started_at: started, finished_at: new Date() });
   }
 }
 
@@ -303,6 +394,7 @@ async function runFullSync(ctx: Ctx, account: AdAccount, windowDays: number): Pr
       account_id: account.account_id, mode: "completo", window_days: windowDays,
       rows: rowsWritten, status: "ok", started_at: started, finished_at: new Date(),
     });
+    await runExtras(ctx, account, windowDays);
     return true;
   } catch (e) {
     await logRun(ctx, {
