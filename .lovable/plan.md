@@ -1,92 +1,23 @@
-## SlideForge - Lightweight Slide Viewer
+# Campañas y Analítica con datos reales
 
-### Overview
-A minimal, personal slide-viewing tool with PDF-style fixed aspect ratio slides. Built as a lightweight React app with local-only state management.
+Objetivo: que todo lo que se ve en estas dos páginas salga de los datos reales de Meta (los que se sincronizan a diario), respetando el cliente elegido en el Dashboard y la regla de monedas.
 
----
+## Campañas (`compaign.html`)
+- Encabezado: título "Campañas", subtítulo con el rango real de fechas; la hora/fecha fija de 2023 pasa a fecha y hora actuales (como en Analítica).
+- Botones Bookmark / Start / Pause / Stop: se reemplazan por **filtros reales**: Todas · Activas · Sin gasto reciente (según la última actividad de cada campaña). No se encienden ni pausan campañas en Meta desde aquí.
+- "Newest": orden real: Mayor gasto · Más clics · Mejor CTR · Actividad más reciente.
+- Botón de engranaje: pasa a botón de recargar datos.
+- Selector de cliente (el mismo del Dashboard, recordado entre páginas) y selector de período 7/30/90 días.
+- Cada tarjeta: agregar leads y conversaciones (ya existen en la base) y el nombre del cliente/cuenta.
 
-### Core Architecture
+## Analítica (`analytics.html`)
+- Respeta el cliente elegido en el Dashboard.
+- "Objetivos y plataformas": se llena con el **objetivo de campaña** real (columna `objective` de los datos de Meta): gasto y clics por objetivo, y CTR global real. El desglose por plataforma (Facebook/Instagram) no existe en los datos sincronizados; esa parte se oculta en vez de mostrar "Sin datos".
+- "Most Performed Ads": top 5 **anuncios reales** por gasto (nombre del anuncio, campaña, gasto, clics, impresiones). Se quitan los ejemplos "Floor Lamp".
+- Tarjetas de abajo (67,124 / 412,531 / $4,567 / $5,245) y "Trending ads": se llenan con campañas del período, impresiones, gasto del último día y del anterior (con su fecha real), y anuncios con mayor alza.
 
-**1. Fixed Aspect Ratio Canvas (16:9)**
-- All slides render at fixed 1920x1080 internal resolution
-- Zoom controls scale the viewport without changing layout
-- PDF-style viewing - what you see is what you export
-
-**2. Slide Data Model (File-Based)**
-- Each slide is a `.tsx` file in `src/slides/demo/`
-- Full React power: hooks, animations, any component possible
-- Slides are imported and rendered directly from code
-- No database dependency for slide ordering
-
----
-
-### Layout Templates (Pre-built)
-
-1. **Title Slide** - Centered title + subtitle
-2. **Section Header** - Bold header + optional description  
-3. **Two-Column** - Header + left/right content areas
-4. **Three-Up Cards** - Header + 3 equal content boxes
-5. **Chart Focus** - Large chart area + side annotations
-6. **Data Story** - Big number/metric + supporting content below
-7. **Comparison** - Side-by-side with comparison headers
-8. **Timeline** - Horizontal timeline with milestone content
-9. **Quote/Highlight** - Large centered quote with attribution
-10. **Blank Canvas** - Empty for fully custom layouts
-
----
-
-### UI Layout
-
-**Left Sidebar - Slide Navigator**
-- Thumbnail previews of all slides (scaled-down renders)
-- Click to navigate between slides
-- Resizable width
-
-**Main Canvas Area**
-- Currently selected slide at editable zoom level
-- Zoom controls (50%, 75%, 100%, 150%)
-- Previous/next navigation
-- Presentation mode (Shift+P)
-
-**Bottom Panel - Presenter Notes (Optional)**
-- Toggle with Shift+N
-- Notes stored in database per slide
-- Cmd+S to save
-
----
-
-### Component System
-
-**Built-in Components:**
-- Text blocks (headings, paragraphs, lists)
-- Images and videos
-- Charts (bar, line, pie, etc. via Recharts)
-- Code blocks with syntax highlighting
-- Tables
-- Shapes and dividers
-- Metric/KPI cards
-- Icons (via Lucide)
-
-**Custom Component Freedom:**
-- Full access to CSS animations
-- Any React component possible within slides
-
----
-
-### State Management
-
-- **Local-only**: Slide order managed in React state
-- **Presenter notes**: Stored in database (optional feature)
-- **No authentication required**
-- **Refreshing resets to default slide order**
-
----
-
-### Design & Style
-
-- **Minimal & Clean** aesthetic (Notion/Linear inspired)
-- Monospace accents for technical feel
-- Generous whitespace
-- Subtle shadows and borders
-- Dark mode support
-- Smooth transitions and micro-interactions
+## Detalles técnicos
+- Shared: `localStorage['apache360.selectedClientId']` leído por compaign.js/analytics.js y enviado como `client_id` a `windsor-metrics`.
+- `windsor-metrics`: agregar `objectiveBreakdown` (desde `meta_datos.objective`, RLS por JWT) y `topAds` a nivel anuncio (`ad_id`, `ad_name`), más `leads`/`messaging_conversations` por campaña. Nueva RPC SQL `meta_ad_totals(_days, _client_id)` y `meta_objective_totals(_days, _client_id)` como `security invoker` (RLS sigue mandando), versionadas en `supabase/migrations/`.
+- Redesplegar `windsor-metrics` y verificar: con sesión 200 y datos; sin sesión 401.
+- Sin cambios en `/app` (React).
