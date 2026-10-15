@@ -93,6 +93,8 @@
 			var d = PRESET_DAYS[$(this).data("preset")];
 			if (d && d !== days) { days = d; load(); }
 		});
+		$(document).on("change", "#homeClientSelect", function () { setTimeout(load, 0); });
+		$(document).on("click", "#reloadMetrics", function () { load(); });
 		setTimeout(load, 300);
 	});
 })(jQuery);

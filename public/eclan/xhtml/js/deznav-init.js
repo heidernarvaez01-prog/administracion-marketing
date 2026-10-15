@@ -30,7 +30,7 @@ function getUrlParams(dParam){
 		headerBg: "color_1",
 		navheaderBg: "color_1",
 		sidebarBg: "color_1",
-		sidebarStyle: "mini",
+		sidebarStyle: "full",
 		sidebarPosition: "unset",
 		headerPosition: "fixed",
 		containerLayout: "full",
