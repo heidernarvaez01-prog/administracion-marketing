@@ -85,6 +85,9 @@
 			initialView: "dayGridMonth",
 			headerToolbar: { left: "prev,next today", center: "title", right: "dayGridMonth,listMonth" },
 			height: "auto",
+			dayMaxEvents: 4,
+			locale: "es",
+			buttonText: { today: "hoy", month: "mes", list: "lista" },
 			events: events,
 		});
 		calendar.render();
