@@ -21,11 +21,11 @@
 				$("<td>").append($("<div>", { class: "d-flex align-items-center" }).append(
 					$("<div>", { class: "progress flex-grow-1 me-2", style: "height:6px" }).append($("<div>", { class: "progress-bar bg-primary", style: "width:" + share + "%" })),
 					$("<span>", { class: "fs-13" }).text(share.toFixed(0) + "%"))),
-				td(fmtInt(r.clicks), 1), td(ctr.toFixed(2) + "%", 1), td(fmtInt(r.leads), 1), td(fmtInt(r.messaging_conversations), 1)));
+				td(fmtInt(r.clicks), 1), td(ctr.toFixed(2) + "%", 1)));
 		});
-		if (!list.length) $b.append($("<tr>").append($("<td>", { colspan: 8, class: "text-muted" }).text("Sin datos por región en este período.")));
+		if (!list.length) $b.append($("<tr>").append($("<td>", { colspan: 6, class: "text-muted" }).text("Sin datos por región en este período.")));
 		$("#geoMore").toggleClass("d-none", list.length <= LIMIT).text(showAll ? "Ver solo las 10 principales" : "Ver todas las regiones (" + list.length + ")");
-		$("#geoSubtitle").text("Dónde está la gente que ve los anuncios · últimos " + days + " días");
+		$("#geoSubtitle").text("Dónde está la gente que ve los anuncios · últimos " + days + " días · Meta no reporta leads ni conversaciones por región");
 	}
 
 	function load() {
@@ -48,7 +48,7 @@
 			render();
 		}).catch(function (err) {
 			console.error("meta_breakdown_totals region:", err);
-			$("#geoBody").empty().append($("<tr>").append($("<td>", { colspan: 8, class: "text-danger" }).text("No se pudieron cargar los datos por región.")));
+			$("#geoBody").empty().append($("<tr>").append($("<td>", { colspan: 6, class: "text-danger" }).text("No se pudieron cargar los datos por región.")));
 		});
 	}
 
