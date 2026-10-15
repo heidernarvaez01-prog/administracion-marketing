@@ -141,3 +141,4 @@ tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: r
 @media only screen and (max-width: 1480px) {
 	.widget-stat .media .media-body h1.fs-36 { font-size: 22px !important; white-space: nowrap; }
 }
+.widget-stat .media .media-body p { hyphens: auto; }
