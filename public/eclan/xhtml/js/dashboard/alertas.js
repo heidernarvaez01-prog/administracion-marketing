@@ -305,13 +305,17 @@
 			var clients = clientsRes.data || [];
 			return supabase.from("audit_records").select("*").then(function (recordsRes) {
 				var records = recordsRes.data || [];
-				return WindsorClient.fetchMetrics({ raw: true }).catch(function () { return { dailyCampaignTotals: [] }; }).then(function (windsorData) {
-					var daily = windsorData.dailyCampaignTotals || [];
+				// windsor-metrics?raw=1 exige client_id: se pide un detalle por cliente.
+				return Promise.all(clients.map(function (client) {
+					return WindsorClient.fetchMetrics({ raw: true, clientId: client.id })
+						.then(function (d) { return d.dailyCampaignTotals || []; })
+						.catch(function () { return []; });
+				})).then(function (dailyByClient) {
 					var campaignAlerts = [];
 					var healthyCount = 0;
-					clients.forEach(function (client) {
+					clients.forEach(function (client, idx) {
 						var clientRecords = records.filter(function (r) { return r.client_id === client.id; });
-						var rows = AuditLib.buildAuditRows(clientRecords, daily, scope.thresholds, scope.enabledTypes);
+						var rows = AuditLib.buildAuditRows(clientRecords, dailyByClient[idx], scope.thresholds, scope.enabledTypes);
 						rows.forEach(function (row) {
 							if (row.alerts.length === 0) { healthyCount++; return; }
 							row.alerts.forEach(function (alert) {
