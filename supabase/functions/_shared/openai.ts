@@ -54,19 +54,29 @@ export interface ChatCompletionResult {
   toolCalls?: OpenAiToolCall[];
 }
 
+// Sin OPENAI_API_KEY se usa el gateway de Lovable AI (OpenAI-compatible,
+// con tool-calling) con LOVABLE_API_KEY. Los nombres gpt-* se traducen.
+export function resolveAiEndpoint(model: string): { url: string; key: string | undefined; model: string } {
+  const openai = Deno.env.get('OPENAI_API_KEY');
+  if (openai) return { url: 'https://api.openai.com/v1/chat/completions', key: openai, model };
+  const mapped = model.includes('/') ? model : (model.includes('mini') ? 'google/gemini-2.5-flash' : 'google/gemini-2.5-pro');
+  return { url: 'https://ai.gateway.lovable.dev/v1/chat/completions', key: Deno.env.get('LOVABLE_API_KEY'), model: mapped };
+}
+
 export async function chatCompletion(params: ChatCompletionParams): Promise<ChatCompletionResult> {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) return { ok: false, content: '', error: 'OPENAI_API_KEY is not configured' };
+  const ep = resolveAiEndpoint(params.model);
+  const apiKey = ep.key;
+  if (!apiKey) return { ok: false, content: '', error: 'No AI key configured' };
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch(ep.url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: params.model,
+        model: ep.model,
         max_tokens: params.maxTokens ?? 800,
         ...(params.temperature != null ? { temperature: params.temperature } : {}),
         ...(params.jsonMode ? { response_format: { type: 'json_object' } } : {}),
@@ -77,6 +87,9 @@ export async function chatCompletion(params: ChatCompletionParams): Promise<Chat
 
     if (res.status === 429) {
       return { ok: false, content: '', status: 429, rateLimited: true, error: 'Rate limit exceeded' };
+    }
+    if (res.status === 402) {
+      return { ok: false, content: '', status: 402, error: 'Créditos de IA agotados' };
     }
     if (!res.ok) {
       const text = await res.text();
