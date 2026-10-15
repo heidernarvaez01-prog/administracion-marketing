@@ -134,3 +134,7 @@ tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: r
 .compaign-row .media-body { min-width: 0; }
 .compaign-row .media-body h3 a { display: block; overflow-wrap: anywhere; }
 .compaign-row .media-body > span { display: block; overflow-wrap: anywhere; margin-left: 0 !important; }
+.widget-stat .media .media-body p.wspace-no { white-space: normal; }
+@media only screen and (max-width: 1480px) {
+	.widget-stat .media .media-body h1.fs-36 { font-size: 24px; }
+}
