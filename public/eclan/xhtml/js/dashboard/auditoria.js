@@ -11,6 +11,13 @@
 	var SUPABASE_ANON_KEY = "sb_publishable_ldumgPigulWT8adpCHpa_Q_dLVy4EC-";
 
 	var clientId = new URLSearchParams(window.location.search).get("client_id");
+	// Sin client_id en la URL: usar el cliente elegido en el Dashboard o
+	// mandar a elegir uno (antes mostraba "Cliente no encontrado").
+	if (!clientId) {
+		try { clientId = localStorage.getItem("apache360.selectedClientId") || null; } catch (e) {}
+		if (clientId) { window.history.replaceState(null, "", window.location.pathname + "?client_id=" + clientId); }
+		else { window.location.replace("clientes.html"); return; }
+	}
 
 	var $loading = $("#auditLoading");
 	var $content = $("#auditContent");
