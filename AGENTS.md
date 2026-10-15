@@ -1,1 +1,2 @@
 - AI calls in edge functions go through `_shared/openai.ts` `resolveAiEndpoint`: OpenAI if `OPENAI_API_KEY` exists, otherwise Lovable AI Gateway with `LOVABLE_API_KEY` — so AI features work without an extra secret.
+- Meta breakdowns (platform, age/gender, geo) live in their own campaign-day tables and are synced as separate Windsor calls after each full sync: Meta rejects mixing breakdowns with each other or with omni/ranking fields.
