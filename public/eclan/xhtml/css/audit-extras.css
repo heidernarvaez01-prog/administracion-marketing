@@ -123,3 +123,22 @@ tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: r
 	.fc .fc-view-harness { min-width: 640px; }
 	.fc .fc-toolbar { flex-wrap: wrap; gap: .5rem; }
 }
+
+/* Distribución de espacios: textos largos no deben empujar íconos ni columnas */
+.widget-stat .media .media-body { min-width: 0; }
+.widget-stat .media .media-body h1 { overflow-wrap: anywhere; }
+@media only screen and (max-width: 1480px) {
+	.widget-stat .media .media-body h1.fs-36 { font-size: 28px; }
+	.widget-stat .media > span { height: 60px; width: 60px; min-width: 60px; font-size: 26px; }
+}
+.compaign-row .media-body { min-width: 0; }
+.compaign-row .media-body h3 a { display: block; overflow-wrap: anywhere; }
+.compaign-row .media-body > span { display: block; overflow-wrap: anywhere; margin-left: 0 !important; }
+.widget-stat .media .media-body p.wspace-no { white-space: normal; }
+@media only screen and (max-width: 1480px) {
+	.widget-stat .media .media-body h1.fs-36 { font-size: 24px; }
+}
+@media only screen and (max-width: 1480px) {
+	.widget-stat .media .media-body h1.fs-36 { font-size: 22px !important; white-space: nowrap; }
+}
+.widget-stat .media .media-body p { hyphens: auto; }
