@@ -343,6 +343,7 @@
 			selectedCurrency = data.currency;
 			renderWindsorSection(data);
 			renderPeriodTotals(periodRes.data || []);
+			$(document).trigger("apache360:metrics", [data]);
 		}).catch(function (err) {
 			console.error("windsor-metrics:", err);
 			$("#topCampaignsList").empty().append(

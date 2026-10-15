@@ -1167,6 +1167,93 @@
 							</div>
 						</div>
 					</div>
+<div class="row" id="homeBreakdowns">
+					<div class="col-xl-6">
+						<div class="card">
+							<div class="card-header border-0 d-block">
+								<h3 class="fs-20 text-black mb-0">Objetivos y CTR</h3>
+								<p class="fs-14 mb-0 text-muted">Reparto de clics por objetivo de campaña</p>
+							</div>
+							<div class="card-body row align-items-center">
+								<div class="col-md-7"><div id="chartCircle"></div></div>
+								<div class="col-md-5"><div id="chartratio"></div><div class="text-center fs-14 text-muted">CTR global del período</div></div>
+							</div>
+						</div>
+					</div>
+					<div class="col-xl-6">
+						<div class="card">
+							<div class="card-header border-0 pb-0"><h3 class="fs-20 text-black mb-0">Anuncios con más gasto</h3></div>
+							<div class="card-body pb-0" id="mostPerformedAdsList"><p class="text-muted">Cargando…</p></div>
+						</div>
+					</div>
+					<div class="col-xl-12">
+						<div class="card">
+							<div class="card-header border-0 pb-0 d-block"><h3 class="fs-20 text-black mb-0">Anuncios en tendencia</h3><p class="fs-14 mb-0 text-muted">Los que más subieron su gasto en los últimos 3 días</p></div>
+							<div class="card-body pb-0" id="trendingAdsList"><p class="text-muted">Cargando…</p></div>
+						</div>
+					</div>
+					<div class="col-xl-12">
+								<div class="card" id="platformsCard">
+									<div class="card-header border-0 d-flex flex-wrap align-items-center">
+										<div>
+											<h3 class="fs-20 text-black mb-0">Facebook vs Instagram</h3>
+											<p class="fs-14 mb-0 text-muted" id="platformsSubtitle">Rendimiento por plataforma y ubicación</p>
+										</div>
+										<select class="form-control form-control-sm ms-auto d-none" id="platformsCurrency" style="width:auto"></select>
+									</div>
+									<div class="card-body pt-0">
+										<div class="row" id="platformsSummary"></div>
+										<h4 class="fs-16 text-black mt-3 mb-2">Por ubicación</h4>
+										<div class="table-responsive">
+											<table class="table table-sm mb-0 fs-14">
+												<thead><tr><th>Plataforma</th><th>Ubicación</th><th class="text-end">Gasto</th><th class="text-end">Impresiones</th><th class="text-end">Clics</th><th class="text-end">CTR</th><th class="text-end">CPC</th><th class="text-end">Leads</th><th class="text-end">Conversaciones</th></tr></thead>
+												<tbody id="placementsBody"><tr><td colspan="9" class="text-muted">Cargando…</td></tr></tbody>
+											</table>
+										</div>
+									</div>
+								</div>
+							</div>
+					<div class="col-xl-12">
+								<div class="card" id="demoCard">
+									<div class="card-header border-0 d-flex flex-wrap align-items-center">
+										<div>
+											<h3 class="fs-20 text-black mb-0">Edad y género</h3>
+											<p class="fs-14 mb-0 text-muted" id="demoSubtitle">Quién responde a los anuncios</p>
+										</div>
+										<select class="form-control form-control-sm ms-auto d-none" id="demoCurrency" style="width:auto"></select>
+									</div>
+									<div class="card-body pt-0">
+										<div class="row" id="demoGenders"></div>
+										<div class="table-responsive mt-2">
+											<table class="table table-sm mb-0 fs-14">
+												<thead><tr><th>Edad</th><th class="text-end">Gasto</th><th style="min-width:140px">Mujeres / Hombres (gasto)</th><th class="text-end">Clics</th><th class="text-end">CTR</th><th class="text-end">Leads</th><th class="text-end">Conversaciones</th><th class="text-end">Costo por conversación</th></tr></thead>
+												<tbody id="demoBody"><tr><td colspan="8" class="text-muted">Cargando…</td></tr></tbody>
+											</table>
+										</div>
+									</div>
+								</div>
+							</div>
+					<div class="col-xl-12">
+								<div class="card" id="geoCard">
+									<div class="card-header border-0 d-flex flex-wrap align-items-center">
+										<div>
+											<h3 class="fs-20 text-black mb-0">País y región</h3>
+											<p class="fs-14 mb-0 text-muted" id="geoSubtitle">Dónde está la gente que ve los anuncios (Meta no reporta leads ni conversaciones por región)</p>
+										</div>
+										<select class="form-control form-control-sm ms-auto d-none" id="geoCurrency" style="width:auto"></select>
+									</div>
+									<div class="card-body pt-0">
+										<div class="table-responsive">
+											<table class="table table-sm mb-0 fs-14">
+												<thead><tr><th>País</th><th>Región</th><th class="text-end">Gasto</th><th style="min-width:120px">% del gasto</th><th class="text-end">Clics</th><th class="text-end">CTR</th></tr></thead>
+												<tbody id="geoBody"><tr><td colspan="6" class="text-muted">Cargando…</td></tr></tbody>
+											</table>
+										</div>
+										<a href="javascript:void(0);" class="d-none fs-14" id="geoMore">Ver todas las regiones</a>
+									</div>
+								</div>
+							</div>
+				</div>
 				</div>
             </div>
         </div>
@@ -1206,6 +1293,7 @@
     <!-- Required vendors -->
     <script src="vendor/global/global.min.js"></script>
 	<script src="vendor/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
+	<script src="js/dashboard/app-menu.js"></script>
 	<script src="js/custom.min.js"></script>
 	<script src="js/deznav-init.js"></script>
 
@@ -1219,6 +1307,10 @@
 	<script src="js/dashboard/role-ui.js"></script>
 	<script src="js/dashboard/windsor-client.js"></script>
 	<script src="js/dashboard/dashboard-home.js"></script>
+	<script src="js/dashboard/dashboard-extras.js"></script>
+	<script src="js/dashboard/analytics-platforms.js"></script>
+	<script src="js/dashboard/analytics-demographics.js"></script>
+	<script src="js/dashboard/analytics-geo.js"></script>
 
 </body>
 </html>
