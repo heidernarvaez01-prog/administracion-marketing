@@ -152,10 +152,14 @@ serve(async (req) => {
       });
     }
 
-    const [dailyRes, campaignRes] = await Promise.all([
+    const [dailyRes, campaignRes, adRes, objRes] = await Promise.all([
       supabase.rpc("meta_daily_totals", { _days: days, _client_id: clientId }),
       supabase.rpc("meta_campaign_totals", { _days: days, _client_id: clientId }),
+      supabase.rpc("meta_ad_totals", { _days: days, _client_id: clientId }),
+      supabase.rpc("meta_objective_totals", { _days: days, _client_id: clientId }),
     ]);
+    if (adRes.error) throw adRes.error;
+    if (objRes.error) throw objRes.error;
 
     if (dailyRes.error) throw dailyRes.error;
     if (campaignRes.error) throw campaignRes.error;
@@ -225,19 +229,43 @@ serve(async (req) => {
       ctr: c.impressions > 0 ? round((c.clicks / c.impressions) * 100, 2) : 0,
       status: fechaCorte && new Date(c.last_fecha) >= fechaCorte ? "On Going" : "Expired",
       lastDate: c.last_fecha,
+      clientId: c.client_id,
+      accountId: c.account_id,
+      leads: round((c as unknown as { leads: number }).leads, 0),
+      conversations: round((c as unknown as { messaging_conversations: number }).messaging_conversations, 0),
     }));
 
-    // "topAds": ya no hay nivel de anuncio/imagen en meta_datos (sin
-    // image_url ni ad_id en los RPC) — se simplifica a top campañas por
-    // gasto, reusando la misma forma que ya consume analytics.js.
-    const topAds = campaigns.slice(0, 5).map((c) => ({
-      campaign: c.campaign,
-      adName: c.campaign,
-      datasource: c.datasource,
-      spend: c.spend,
-      clicks: c.clicks,
-      impressions: c.impressions,
-    }));
+    // Anuncios reales (nivel ad_id) en la moneda elegida — nunca se mezclan monedas.
+    type AdRow = { account_id: string; currency: string; campaign_name: string; ad_id: string; ad_name: string;
+      spend: number; impressions: number; clicks: number; spend_recent: number; spend_prior: number; last_fecha: string };
+    const adsPrimary = ((adRes.data || []) as AdRow[]).filter((r) => r.currency === primaryCurrency);
+    const mapAd = (a: AdRow) => ({
+      campaign: a.campaign_name || "(sin campaña)",
+      adName: a.ad_name || a.ad_id,
+      datasource: "META · últ. actividad " + a.last_fecha,
+      spend: round(a.spend),
+      clicks: round(a.clicks, 0),
+      impressions: round(a.impressions, 0),
+      trend: round(Number(a.spend_recent || 0) - Number(a.spend_prior || 0)),
+    });
+    const topAds = adsPrimary.slice(0, 5).map(mapAd);
+    const trendingAds = adsPrimary.map(mapAd).filter((a) => a.trend > 0).sort((x, y) => y.trend - x.trend).slice(0, 5);
+
+    // Clics por objetivo (los clics sí se suman entre monedas: no son dinero).
+    type ObjRow = { objective: string; clicks: number; spend: number; currency: string };
+    const clicksByObj = new Map<string, number>();
+    for (const r of (objRes.data || []) as ObjRow[]) clicksByObj.set(r.objective, (clicksByObj.get(r.objective) ?? 0) + Number(r.clicks || 0));
+    const objTotal = [...clicksByObj.values()].reduce((a, b) => a + b, 0);
+    const objSorted = [...clicksByObj.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const objectiveBreakdown = {
+      labels: objSorted.map(([k]) => k.replace(/^OUTCOME_/, "").replace(/_/g, " ").toLowerCase()),
+      series: objSorted.map(([, v]) => (objTotal > 0 ? round((v / objTotal) * 100, 1) : 0)),
+    };
+
+    const engagementByPlatform = {
+      categories: dailyPrimary.slice(-14).map((r) => r.fecha),
+      series: [{ name: "Clics Meta", data: dailyPrimary.slice(-14).map((r) => round(r.clicks, 0)) }],
+    };
 
     return jsonResponse({
       error: false,
@@ -245,17 +273,17 @@ serve(async (req) => {
       currency: primaryCurrency,
       currencies,
       kpis,
+      lastFecha,
+      prevFecha,
       clickSummary,
       spendSummary,
       campaigns,
       topAds,
-      // Sin equivalente real en meta_datos (no hay desglose por red ni por
-      // campaign_objective) — se devuelven vacíos; compaign.html/
-      // analytics.html ya tienen manejo de "sin datos" para estos campos.
+      trendingAds,
       plataformas: [],
-      objectiveBreakdown: { labels: [], series: [] },
+      objectiveBreakdown,
       ctrGauge: ctr,
-      engagementByPlatform: { categories: [], series: [] },
+      engagementByPlatform,
     });
   } catch (error: unknown) {
     const mensaje = error instanceof Error ? error.message : "Error desconocido";
