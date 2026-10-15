@@ -59,7 +59,7 @@ export interface ChatCompletionResult {
 export function resolveAiEndpoint(model: string): { url: string; key: string | undefined; model: string } {
   const openai = Deno.env.get('OPENAI_API_KEY');
   if (openai) return { url: 'https://api.openai.com/v1/chat/completions', key: openai, model };
-  const mapped = model.includes('/') ? model : (model.includes('mini') ? 'google/gemini-2.5-flash' : 'google/gemini-2.5-pro');
+  const mapped = model.includes('/') ? model : (model.includes('mini') ? 'google/gemini-3.8-flash' : 'google/gemini-3.1-pro-preview');
   return { url: 'https://ai.gateway.lovable.dev/v1/chat/completions', key: Deno.env.get('LOVABLE_API_KEY'), model: mapped };
 }
 

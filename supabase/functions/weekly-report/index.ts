@@ -313,7 +313,7 @@ async function generateForClient(
 
   // AI executive summary — strategist-grade, goes beyond the raw metrics
   let aiSummary = "";
-  const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
+  const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") || Deno.env.get("LOVABLE_API_KEY");
   if (OPENAI_KEY && campaigns.length > 0) {
     const result = await chatCompletion({
       model: "gpt-4o",

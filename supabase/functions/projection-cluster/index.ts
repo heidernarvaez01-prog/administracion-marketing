@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveAiEndpoint } from "../_shared/openai.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -159,10 +160,11 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const ai = resolveAiEndpoint("gpt-4o");
+    const OPENAI_API_KEY = ai.key;
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY missing");
+    if (!OPENAI_API_KEY) throw new Error("AI key missing");
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return jsonError("Unauthorized", 401);
@@ -261,14 +263,14 @@ Build the deliverable for this client following the process and the output forma
 
     const system = `${cluster.instructions}\n\n${outputFormat(cluster.sections, HERO_META_GENERIC).replace("<cluster eyebrow>", cluster.eyebrow)}`;
 
-    const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+    const aiRes = await fetch(ai.url, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: ai.model,
         max_tokens: 16000,
         stream: true,
         messages: [
@@ -278,6 +280,7 @@ Build the deliverable for this client following the process and the output forma
       }),
     });
 
+    if (aiRes.status === 402) return jsonError("Créditos de IA agotados.", 402);
     if (aiRes.status === 429) return jsonError("AI rate limit reached. Try again in a few seconds.", 429);
     if (!aiRes.ok || !aiRes.body) {
       const t = await aiRes.text();
