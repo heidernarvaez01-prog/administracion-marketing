@@ -1087,6 +1087,27 @@
 									</div>
 								</div>
 							</div>
+							<div class="col-xl-12">
+								<div class="card" id="platformsCard">
+									<div class="card-header border-0 d-flex flex-wrap align-items-center">
+										<div>
+											<h3 class="fs-20 text-black mb-0">Facebook vs Instagram</h3>
+											<p class="fs-14 mb-0 text-muted" id="platformsSubtitle">Rendimiento por plataforma y ubicación</p>
+										</div>
+										<select class="form-control form-control-sm ms-auto d-none" id="platformsCurrency" style="width:auto"></select>
+									</div>
+									<div class="card-body pt-0">
+										<div class="row" id="platformsSummary"></div>
+										<h4 class="fs-16 text-black mt-3 mb-2">Por ubicación</h4>
+										<div class="table-responsive">
+											<table class="table table-sm mb-0 fs-14">
+												<thead><tr><th>Plataforma</th><th>Ubicación</th><th class="text-end">Gasto</th><th class="text-end">Impresiones</th><th class="text-end">Clics</th><th class="text-end">CTR</th><th class="text-end">CPC</th><th class="text-end">Leads</th><th class="text-end">Conversaciones</th></tr></thead>
+												<tbody id="placementsBody"><tr><td colspan="9" class="text-muted">Cargando…</td></tr></tbody>
+											</table>
+										</div>
+									</div>
+								</div>
+							</div>
 						</div>
 					</div>
 					<div class="col-xl-6 col-xxl-12">
@@ -1424,6 +1445,7 @@
 	<!-- Windsor.ai: cliente compartido + datos reales de campañas -->
 	<script src="js/dashboard/windsor-client.js"></script>
 	<script src="js/dashboard/analytics.js"></script>
+	<script src="js/dashboard/analytics-platforms.js"></script>
 	
 	
 </body>
