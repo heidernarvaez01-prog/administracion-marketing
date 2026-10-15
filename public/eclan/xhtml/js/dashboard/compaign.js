@@ -93,7 +93,7 @@
 	}
 
 	function loadClients() {
-		return AuditClient.client.from("audit_clients").select("id,name").order("name").then(function (res) {
+		return AuditClient.supabase.from("audit_clients").select("id,name").order("name").then(function (res) {
 			var list = res.data || [];
 			list.forEach(function (c) { clientNames[c.id] = c.name; });
 			if (selectedClientId && !clientNames[selectedClientId]) selectedClientId = "";
