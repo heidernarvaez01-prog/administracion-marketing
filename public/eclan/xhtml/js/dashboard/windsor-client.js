@@ -18,6 +18,35 @@
 
 	var SUPABASE_URL = "https://szdivobcbdkiszgrizic.supabase.co";
 	var SUPABASE_ANON_KEY = "sb_publishable_ldumgPigulWT8adpCHpa_Q_dLVy4EC-";
+	var refreshPromise = null;
+
+	function sessionError() {
+		var err = new Error("Sesión requerida. Vuelve a iniciar sesión.");
+		err.status = 401;
+		return err;
+	}
+
+	// Una renovación compartida evita rotar el mismo refresh token en paralelo.
+	function refreshAccessToken() {
+		if (!refreshPromise) {
+			refreshPromise = Promise.resolve().then(function () {
+				var auth = window.AuditClient && window.AuditClient.supabase && window.AuditClient.supabase.auth;
+				if (!auth) throw sessionError();
+				return auth.refreshSession();
+			}).then(function (result) {
+				var session = result.data && result.data.session;
+				if (result.error || !session || !session.access_token) throw sessionError();
+				return session.access_token;
+			}).then(function (token) {
+				refreshPromise = null;
+				return token;
+			}, function () {
+				refreshPromise = null;
+				throw sessionError();
+			});
+		}
+		return refreshPromise;
+	}
 
 	function fetchMetrics(options) {
 		options = options || {};
@@ -29,22 +58,25 @@
 		if (options.raw) params.push("raw=1");
 		if (params.length) url += "?" + params.join("&");
 
-		var getToken = (typeof AuditClient !== "undefined")
-			? AuditClient.getSession().then(function (session) { return session && session.access_token; })
+		var getToken = window.AuditClient
+			? window.AuditClient.getSession().then(function (session) { return session && session.access_token; })
 			: Promise.resolve(null);
 
-		return getToken.then(function (accessToken) {
-			if (!accessToken) {
-				var authErr = new Error("Sesión requerida.");
-				authErr.status = 401;
-				throw authErr;
-			}
+		function request(accessToken) {
 			return fetch(url, {
 				headers: {
 					apikey: SUPABASE_ANON_KEY,
 					Authorization: "Bearer " + accessToken,
 				},
 			});
+		}
+
+		return getToken.then(function (accessToken) {
+			if (!accessToken) throw sessionError();
+			return request(accessToken);
+		}).then(function (res) {
+			if (res.status !== 401) return res;
+			return refreshAccessToken().then(request);
 		}).then(function (res) {
 			return res.json().then(function (body) {
 				if (!res.ok || body.error) {
