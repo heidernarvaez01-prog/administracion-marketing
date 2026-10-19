@@ -4,3 +4,4 @@
 - Eclan product pages share their on-demand navigation and compact session profile through app-menu.js and audit-extras.css, keeping shell layout consistent without per-page duplication.
 - Intelligence functions authorize client membership before service-level reads and filter metrics by account IDs, preventing cross-client collisions in campaign names; preview generation must not persist or send for non-admins.
 - Team membership changes run through admin-users with server-validated administration and never modify global administrator roles, keeping account credentials independent of data access.
+- Eclan metrics requests recover a rejected session through one shared refresh and one retry; bounded recovery preserves authentication while avoiding parallel token rotation.

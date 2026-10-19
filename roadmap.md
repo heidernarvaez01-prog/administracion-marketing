@@ -11,3 +11,7 @@
 - [x] Recuperar la lista de miembros y controles de cambio de rol para el administrador.
 - [x] Permitir a viewers usar Inteligencia sin editar ni acceder a otros clientes.
 - [x] Verificar respuestas de IA basadas en datos reales y aislamiento de acceso.
+
+# Recuperación de sesión
+- [ ] Recuperar consultas de métricas rechazadas con 401 mediante una renovación compartida y un único reintento.
+- [ ] Verificar recuperación, límite de reintentos y Dashboard de Ginecea con sesión real, manteniendo el rechazo sin sesión.
