@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveAiEndpoint } from "../_shared/openai.ts";
+import { clientAccess, clientMetricRows } from "../_shared/intelligence-access.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -174,18 +175,15 @@ serve(async (req) => {
     if (userErr || !userData.user) return jsonError("Unauthorized", 401);
     const userId = userData.user.id;
 
-    const { clientId, clusterKey: rawKey } = await req.json();
+    const { clientId, clusterKey: rawKey, preview } = await req.json();
     if (!clientId || typeof clientId !== "string") return jsonError("clientId is required", 400);
     const clusterKey = (typeof rawKey === "string" && CLUSTERS[rawKey]) ? rawKey : "la_formula_v2";
     const cluster = CLUSTERS[clusterKey];
 
-    // Client must belong to the user
-    const { data: client } = await supabase
-      .from("audit_clients")
-      .select("id, name, description, user_id")
-      .eq("id", clientId)
-      .maybeSingle();
-    if (!client || client.user_id !== userId) return jsonError("Client not found", 404);
+    const access = await clientAccess(authHeader, clientId);
+    if (!access) return jsonError("Client not found", 404);
+    if (!access.admin && preview !== true) return jsonError("Solo puedes generar una vista previa sin guardar.", 403);
+    const client = access.client;
 
     // ── Once-per-month limit per client + cluster ──
     const { data: monthRuns } = await supabase
@@ -195,7 +193,7 @@ serve(async (req) => {
       .eq("cluster_key", clusterKey)
       .gte("created_at", monthStartIso())
       .limit(1);
-    if (monthRuns && monthRuns.length > 0) {
+    if (!preview && monthRuns && monthRuns.length > 0) {
       return jsonError("This cluster has already been run for this client this month. It will be available again next month.", 429);
     }
 
@@ -215,23 +213,16 @@ serve(async (req) => {
       .from("audit_records")
       .select("account_id, campaign_name, platform, presupuesto_total, fecha_inicio, fecha_fin")
       .eq("client_id", clientId);
-    const campaignNames = Array.from(new Set((audits ?? []).map((a) => a.campaign_name).filter(Boolean)));
-    let metrics: any[] = [];
-    if (campaignNames.length) {
-      const { data } = await supabase
-        .from("meta_datos")
-        .select("campaign_name, adset_name, plataforma, fecha, total_cost, impressions, clicks, reach, ctr_all, cpc, cpm, conversions, link_clicks, interactions, frequency, objective")
-        .in("campaign_name", campaignNames)
-        .order("fecha", { ascending: false })
-        .limit(800);
-      metrics = data ?? [];
-    }
+    const metrics = await clientMetricRows(supabase, access.accountIds);
+    const { data: accountCurrencies } = await access.scoped.from('ad_accounts').select('account_id,currency');
+    const currencies = new Map((accountCurrencies || []).map((a) => [a.account_id, a.currency || 'Sin moneda']));
 
     // Aggregate by campaign (and keep recent ad-set rows for tactical depth)
     const byCampaign = new Map<string, any>();
     for (const m of metrics) {
-      const k = m.campaign_name;
-      const cur = byCampaign.get(k) ?? { campaign: k, platform: m.plataforma, cost: 0, impressions: 0, clicks: 0, reach: 0, conversions: 0, days: 0 };
+      const currency = currencies.get(m.account_id) || 'Sin moneda';
+      const k = currency + ':' + m.campaign_name;
+      const cur = byCampaign.get(k) ?? { campaign: m.campaign_name, currency, platform: m.plataforma, cost: 0, impressions: 0, clicks: 0, reach: 0, conversions: 0, days: 0 };
       cur.cost += Number(m.total_cost ?? 0);
       cur.impressions += Number(m.impressions ?? 0);
       cur.clicks += Number(m.clicks ?? 0);
@@ -261,7 +252,7 @@ ${JSON.stringify({ auditedCampaigns: audits ?? [], performance: campaignSummary,
 
 Build the deliverable for this client following the process and the output format to the letter.`;
 
-    const system = `${cluster.instructions}\n\n${outputFormat(cluster.sections, HERO_META_GENERIC).replace("<cluster eyebrow>", cluster.eyebrow)}`;
+    const system = `Use only provided facts; never invent numbers, audiences or causes. Keep monetary values separate by currency and label the observed date range. Missing data must be explicit. Recommendations are hypotheses, not proven causes.\n${cluster.instructions}\n\n${outputFormat(cluster.sections, HERO_META_GENERIC).replace("<cluster eyebrow>", cluster.eyebrow)}`;
 
     const aiRes = await fetch(ai.url, {
       method: "POST",

@@ -19,3 +19,17 @@ export async function clientAccess(authorization: string, clientId: string) {
   return { scoped, user, client: clientRes.data, admin: roleRes.data === true,
     accountIds: (accountsRes.data || []).map((a) => a.account_id) };
 }
+
+export async function clientMetricRows(service: any, accountIds: string[]) {
+  if (!accountIds.length) return [];
+  const from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const rows: any[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await service.from('meta_datos').select('*').in('account_id', accountIds)
+      .gte('fecha', from).order('id').range(offset, offset + 999);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return rows;
+}
