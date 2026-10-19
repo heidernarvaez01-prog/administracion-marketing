@@ -1035,19 +1035,21 @@
 					<div class="card mb-4">
 						<div class="card-header"><h4 class="card-title"><i class="fa fa-user-plus me-2"></i>Añadir miembro</h4></div>
 						<div class="card-body">
-							<p class="fs-13 text-muted">Enviamos un correo con el link para que active su cuenta y elija contraseña. El acceso a cuentas publicitarias se asigna aparte, desde la pestaña "Clientes y Agencias".</p>
+							<div id="formSuccess" class="alert alert-success d-none" role="status"></div>
 							<div id="formError" class="alert alert-danger py-2 px-3 d-none"></div>
 							<div class="row g-2 align-items-end">
 								<div class="col-md-6">
 									<label class="form-label fs-13">Correo del miembro</label>
 									<input type="email" class="form-control" id="formEmail" placeholder="persona@empresa.com">
 								</div>
-								<div class="col-md-4">
-									<label class="form-label fs-13">Rol</label>
-									<select class="form-control" id="formRole"><option value="user">Miembro</option><option value="admin">Administrador</option></select>
+								<div class="col-md-6">
+									<label class="form-label fs-13" for="accountMethod">Método de alta</label>
+									<select class="form-control" id="accountMethod"><option value="manual">Definir contraseña</option><option value="invite">Enviar invitación</option></select>
 								</div>
-								<div class="col-md-2">
-									<button type="button" class="btn btn-primary w-100" id="submitFormBtn"><i class="fa fa-paper-plane me-1"></i>Añadir</button>
+								<div class="col-md-6 manual-password-field"><label class="form-label" for="formPassword">Contraseña</label><input type="password" class="form-control" id="formPassword" autocomplete="new-password" minlength="8" maxlength="128"></div>
+								<div class="col-md-6 manual-password-field"><label class="form-label" for="formPasswordConfirm">Confirmar contraseña</label><input type="password" class="form-control" id="formPasswordConfirm" autocomplete="new-password" minlength="8" maxlength="128"></div>
+								<div class="col-md-12">
+									<button type="button" class="btn btn-primary" id="submitFormBtn"><i class="fa fa-user-plus me-1"></i>Crear cuenta</button>
 								</div>
 							</div>
 						</div>
@@ -1055,8 +1057,8 @@
 
 					<!-- Lista de miembros -->
 					<div class="card">
-						<div class="card-header">
-							<h4 class="card-title">Miembros</h4>
+						<div class="card-header flex-wrap gap-2">
+							<h4 class="card-title flex-shrink-0">Miembros</h4>
 							<p class="fs-12 text-muted mb-0">Las cuentas asignadas aquí son del sistema de auditoría antiguo (account_assignments) y solo se muestran para referencia — ya no se editan desde esta pestaña. El acceso de viewers/managers a clientes y cuentas se gestiona en "Clientes y Agencias".</p>
 						</div>
 						<div class="table-responsive">
@@ -1087,6 +1089,19 @@
             Content body end (admin)
         ***********************************-->
 
+        <div class="modal fade" id="passwordModal" tabindex="-1" aria-hidden="true" aria-labelledby="passwordModalTitle">
+            <div class="modal-dialog modal-dialog-centered"><form class="modal-content" id="adminPasswordForm">
+                <div class="modal-header"><h5 class="modal-title" id="passwordModalTitle">Establecer contraseña</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+                <div class="modal-body">
+                    <p id="passwordTargetEmail" class="text-break"></p>
+                    <div id="passwordFormError" class="alert alert-danger d-none" role="alert"></div>
+                    <div class="mb-3"><label class="form-label" for="adminNewPassword">Nueva contraseña</label><input type="password" class="form-control" id="adminNewPassword" autocomplete="new-password" minlength="8" maxlength="128" required></div>
+                    <div class="mb-3"><label class="form-label" for="adminConfirmPassword">Confirmar contraseña</label><input type="password" class="form-control" id="adminConfirmPassword" autocomplete="new-password" minlength="8" maxlength="128" required></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="confirmPasswordChange" required><label class="form-check-label" for="confirmPasswordChange">Confirmo cambiar la contraseña de esta cuenta.</label></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary" id="savePasswordBtn">Guardar contraseña</button></div>
+            </form></div>
+        </div>
         <!-- Modal: nuevo cliente -->
         <div class="modal fade" id="newClientModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">

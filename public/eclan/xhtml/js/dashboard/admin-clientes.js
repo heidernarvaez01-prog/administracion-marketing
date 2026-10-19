@@ -20,12 +20,7 @@
 	var supabase = AuditClient.supabase;
 	var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 	var CURRENCY_RE = /^[A-Z]{3}$/;
-	// Mientras Eclan no tenga su propia pantalla para elegir contraseña
-	// (page-set-password.html, propuesta pendiente de aprobar), el link de
-	// invitación/reset tiene que caer en /app/auth: es la única pantalla que
-	// sabe procesar el token (verifyOtp/exchangeCodeForSession) y llamar a
-	// supabase.auth.updateUser. page-login.html no tiene ese paso.
-	var REDIRECT_TO = window.location.origin + "/app/auth"; // mismo que admin.js
+	var REDIRECT_TO = window.location.origin + "/eclan/xhtml/page-set-password.html";
 
 	var currentUserId = null;
 	var firstLoad = true;
@@ -145,6 +140,9 @@
 				if (res.error || (res.data && res.data.error)) {
 					throw new Error((res.error && res.error.message) || (res.data && res.data.error) || "No se pudo invitar");
 				}
+				if (res.data && res.data.email && !res.data.email.sent) {
+					throw new Error("La cuenta se creó, pero el correo no se envió. Define su contraseña en Equipo y vuelve a añadirla al cliente.");
+				}
 				var uid = res.data && res.data.userId;
 				if (uid) return uid;
 				// alreadyMember:true (u otra respuesta sin userId) -> refrescar lista y buscar por correo.
@@ -157,6 +155,7 @@
 			});
 	}
 
+	$(document).on("apache360:users-changed", function () { if (currentUserId) loadAll(); });
 	// --- Mutaciones (recargan todo tras cada una, igual que el resto de Eclan) ---
 	function loadAll() {
 		if (firstLoad) showCA(null);
