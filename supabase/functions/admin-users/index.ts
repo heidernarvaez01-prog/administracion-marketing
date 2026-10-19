@@ -148,7 +148,7 @@ async function handleList(admin: SupabaseClient) {
     admin.from('agency_members').select('agency_id,user_id,role'),
     admin.from('client_members').select('client_id,user_id,role'),
     admin.from('agencies').select('id,name'),
-    admin.from('audit_clients').select('id,name'),
+    admin.from('audit_clients').select('id,name,agency_id'),
     admin.from('client_accounts').select('client_id,account_id'),
     admin.from('ad_accounts').select('account_id,account_name'),
   ]);
