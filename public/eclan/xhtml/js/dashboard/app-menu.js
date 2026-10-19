@@ -79,7 +79,7 @@
 			{ href: "alertas.html", text: "Alertas", admin: true },
 			{ href: "auditoria.html", text: "Auditoría", admin: true },
 		] },
-		{ label: "Inteligencia", icon: "flaticon-381-idea", admin: true, items: [
+		{ label: "Inteligencia", icon: "flaticon-381-idea", items: [
 			{ href: "preguntar-ia.html", text: "Preguntar a la IA" },
 			{ href: "reporte-semanal.html", text: "Reporte semanal" },
 			{ href: "clusters.html", text: "Clusters" },

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmail } from "../_shared/email.ts";
 import { chatCompletion } from "../_shared/openai.ts";
+import { clientAccess, clientMetricRows, intelligenceOperationAllowed } from "../_shared/intelligence-access.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,6 +51,7 @@ function delta(cur: number, prev: number): string {
 
 interface CampaignWeek {
   campaign: string;
+  currency?: string;
   platform: string | null;
   budget: number;
   totalSpend: number;
@@ -123,9 +125,9 @@ function renderHtml(
       <tr>
         <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;vertical-align:top;">
           <div style="font-weight:600;color:#111827;font-size:13px;">${esc(c.campaign)}</div>
-          <div style="color:#6b7280;font-size:11px;margin-top:2px;">${c.platform ? esc(c.platform.toUpperCase()) : ""} · Budget ${fmtMoney(c.budget)}</div>
+          <div style="color:#6b7280;font-size:11px;margin-top:2px;">${c.platform ? esc(c.platform.toUpperCase()) : ""} · ${c.budget > 0 ? "Budget " + fmtMoney(c.budget) : "Sin presupuesto auditado"}</div>
           <div style="margin-top:4px;font-size:11px;">
-            <span style="display:inline-block;background:${paceColor};color:#fff;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:600;">${paceLabel}</span>
+            <span style="display:inline-block;background:${paceColor};color:#fff;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:600;">${c.budget > 0 ? paceLabel : "Sin evaluación de ritmo"}</span>
             <span style="color:#6b7280;margin-left:6px;">${c.spendPct.toFixed(0)}% spent · ${c.timePct.toFixed(0)}% time</span>
           </div>
         </td>
@@ -267,29 +269,31 @@ async function generateForClient(
   send: boolean,
   anthropicKey: string | undefined,
   includeMonthly = false,
+  persist = true,
 ): Promise<{ html: string; week_start: string; week_end: string; sent: boolean }> {
   const { start, end } = lastWeekWindow();
 
-  const { data: audits } = await supabase
-    .from("audit_records")
-    .select("campaign_name, platform, presupuesto_total, fecha_inicio, fecha_fin, tipo_calendario")
-    .eq("client_id", client.id);
-
-  const campaignNames = Array.from(new Set((audits ?? []).map((a: any) => a.campaign_name).filter(Boolean)));
-  let metrics: any[] = [];
-  if (campaignNames.length) {
-    const { data } = await supabase
-      .from("meta_datos")
-      .select("campaign_name, fecha, total_cost, impressions, clicks, reach, conversions, interactions")
-      .in("campaign_name", campaignNames);
-    metrics = data ?? [];
+  const { data: accounts, error: accountsError } = await supabase.from('client_accounts').select('account_id').eq('client_id', client.id);
+  if (accountsError) throw accountsError;
+  const accountIds = (accounts || []).map((a: any) => a.account_id);
+  const metrics = await clientMetricRows(supabase, accountIds);
+  const { data: currencyRows } = accountIds.length ? await supabase.from('ad_accounts').select('account_id,currency').in('account_id', accountIds) : { data: [] };
+  const currencies = new Map((currencyRows || []).map((a: any) => [a.account_id, a.currency || 'Sin moneda']));
+  const auditMap = new Map<string, any>();
+  for (const m of metrics) {
+    const k = m.account_id + ':' + m.campaign_name;
+    const current = auditMap.get(k);
+    if (!current) auditMap.set(k, { account_id: m.account_id, campaign_name: m.campaign_name, platform: m.plataforma,
+      presupuesto_total: 0, fecha_inicio: m.fecha, fecha_fin: m.fecha, tipo_calendario: 'corridos' });
+    else { current.fecha_inicio = current.fecha_inicio < m.fecha ? current.fecha_inicio : m.fecha; current.fecha_fin = current.fecha_fin > m.fecha ? current.fecha_fin : m.fecha; }
   }
+  const audits = Array.from(auditMap.values());
 
   const prevStart = iso(new Date(new Date(start + "T00:00:00").getTime() - 7 * 86400000));
   const today = iso(new Date());
 
   const campaigns: CampaignWeek[] = (audits ?? []).map((a: any) => {
-    const rows = metrics.filter((m) => m.campaign_name === a.campaign_name);
+    const rows = metrics.filter((m) => m.account_id === a.account_id && m.campaign_name === a.campaign_name);
     const week = aggregate(rows, start, end);
     const prev = aggregate(rows, prevStart, start);
     const budget = Number(a.presupuesto_total ?? 0);
@@ -301,6 +305,7 @@ async function generateForClient(
     const elapsedDays = a.fecha_inicio <= elapsedEnd ? countDays(a.fecha_inicio, elapsedEnd, a.tipo_calendario) : 0;
     return {
       campaign: a.campaign_name,
+      currency: String(currencies.get(a.account_id) || "Sin moneda"),
       platform: a.platform,
       budget,
       totalSpend: allSpend,
@@ -324,7 +329,7 @@ async function generateForClient(
           role: "system",
           content:
             "You are a senior paid media strategist writing the weekly executive summary a client actually wants to read. The client can already see raw numbers in Meta/Google Ads — your value is INTERPRETATION, not repetition. " +
-            "Explain WHY performance moved week over week, what it means for the client's goals, and where things are heading if the trend holds (a concrete projection). Be confident and specific, cite a few key numbers only to support the story. " +
+            "Respond in Spanish. Cite only the supplied metrics; separate currencies, distinguish hypotheses from proven causes, and disclose missing budget or incomplete data. Explain WHY performance moved week over week, what it means for the client's goals, and where things are heading if the trend holds (a concrete projection). Be confident and specific, cite a few key numbers only to support the story. " +
             "Structure as short labeled paragraphs:\n" +
             "1) Headline — the single most important takeaway of the week.\n" +
             "2) What's working — and the reason behind it.\n" +
@@ -355,7 +360,18 @@ async function generateForClient(
     monthly = { curLabel: mw.curLabel, prevLabel: mw.prevLabel, cur, prev };
   }
 
-  const html = renderHtml(client.name, start, end, campaigns, aiSummary, monthly);
+  const moneyGroups = Array.from(new Set(campaigns.map((c) => c.currency || 'Sin moneda')));
+  const documents = (moneyGroups.length ? moneyGroups : ['Sin moneda']).map((currency) => {
+    const groupCampaigns = campaigns.filter((c) => c.currency === currency);
+    let groupMonthly = monthly;
+    if (monthly) {
+      const mw = monthWindows();
+      const groupRows = metrics.filter((m) => currencies.get(m.account_id) === currency);
+      groupMonthly = { ...monthly, cur: aggregate(groupRows, mw.curStart, mw.curEnd), prev: aggregate(groupRows, mw.prevStart, mw.prevEnd) };
+    }
+    return renderHtml(client.name + ' · ' + currency, start, end, groupCampaigns, aiSummary, groupMonthly);
+  });
+  const html = documents.length === 1 ? documents[0] : '<!doctype html><html><head><meta charset="utf-8"></head><body>' + documents.map((doc) => doc.split('<body')[1]?.split('>')[1] ? doc.substring(doc.indexOf('>', doc.indexOf('<body')) + 1, doc.lastIndexOf('</body>')) : '').join('') + '</body></html>';
 
   // Send via direct Resend API when requested and recipients exist
   let sent = false;
@@ -369,6 +385,8 @@ async function generateForClient(
     sent = result.ok;
     if (!result.ok) console.error("Resend send failed", result.status, JSON.stringify(result.error));
   }
+
+  if (!persist) return { html, week_start: start, week_end: end, sent };
 
   // Upsert the report for this week (one per client+week)
   const { data: existing } = await supabase
@@ -439,14 +457,10 @@ serve(async (req) => {
     const { clientId, send, includeMonthly } = await req.json();
     if (!clientId) return jsonRes({ error: "clientId is required" }, 400);
 
-    const { data: client } = await supabase
-      .from("audit_clients")
-      .select("id, name, user_id, report_recipients")
-      .eq("id", clientId)
-      .maybeSingle();
-    if (!client || client.user_id !== userId) return jsonRes({ error: "Client not found" }, 404);
-
-    const result = await generateForClient(supabase, client, !!send, ANTHROPIC_API_KEY, !!includeMonthly);
+    const access = await clientAccess(authHeader, clientId);
+    if (!access) return jsonRes({ error: "Client not found" }, 404);
+    if (!intelligenceOperationAllowed(access.admin, send ? 'send' : 'preview')) return jsonRes({ error: "Solo el administrador puede enviar reportes." }, 403);
+    const result = await generateForClient(supabase, access.client, send === true, ANTHROPIC_API_KEY, !!includeMonthly, send === true);
     return jsonRes(result);
   } catch (e) {
     console.error(e);

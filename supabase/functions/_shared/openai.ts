@@ -142,6 +142,7 @@ export interface RunToolLoopParams {
 export interface RunToolLoopResult {
   ok: boolean;
   content: string;
+  status?: number;
   error?: string;
   rateLimited?: boolean;
   toolCalls: number;
@@ -177,7 +178,7 @@ export async function runToolLoop(params: RunToolLoopParams): Promise<RunToolLoo
     });
 
     if (!result.ok) {
-      return { ok: false, content: '', error: result.error, rateLimited: result.rateLimited, toolCalls: totalToolCalls, iterations: iteration };
+      return { ok: false, content: '', status: result.status, error: result.error, rateLimited: result.rateLimited, toolCalls: totalToolCalls, iterations: iteration };
     }
 
     if (!result.toolCalls?.length) {

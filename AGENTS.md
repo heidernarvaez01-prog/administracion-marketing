@@ -2,3 +2,5 @@
 - Meta breakdowns (platform, age/gender, geo) live in their own campaign-day tables and are synced as separate Windsor calls after each full sync: Meta rejects mixing breakdowns with each other or with omni/ranking fields.
 - Manual account creation and password resets run through admin-users after server-validated administrator authorization; never accept roles or memberships in password actions, so credential management cannot grant data access.
 - Eclan product pages share their on-demand navigation and compact session profile through app-menu.js and audit-extras.css, keeping shell layout consistent without per-page duplication.
+- Intelligence functions authorize client membership before service-level reads and filter metrics by account IDs, preventing cross-client collisions in campaign names; preview generation must not persist or send for non-admins.
+- Team membership changes run through admin-users with server-validated administration and never modify global administrator roles, keeping account credentials independent of data access.

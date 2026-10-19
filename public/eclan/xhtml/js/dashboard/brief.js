@@ -3,6 +3,7 @@
 
 	if (typeof AuditClient === "undefined") return;
 	var supabase = AuditClient.supabase;
+    var canEdit = false;
 	var clientId = new URLSearchParams(window.location.search).get("client_id");
 	// Sin client_id en la URL: usar el cliente elegido en el Dashboard o
 	// mandar a elegir uno (antes mostraba "Cliente no encontrado").
@@ -116,12 +117,14 @@
 
 	var saveTimer = null;
 	function scheduleSave() {
+        if (!canEdit) return;
 		$("#saveStatus").html('<i class="fa fa-circle-o-notch fa-spin me-1"></i>Guardando…');
 		if (saveTimer) clearTimeout(saveTimer);
 		saveTimer = setTimeout(saveNow, 1200);
 	}
 
 	function saveNow() {
+        if (!canEdit) return;
 		if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
 		var brief = readForm();
 		updateProgress(brief);
@@ -142,7 +145,8 @@
 	if (!clientId) {
 		showOnly($clientNotFound);
 	} else {
-		AuditClient.getSession().then(function (session) {
+		Promise.all([AuditClient.getSession(), AuditClient.getCurrentIdentity()]).then(function (results) {
+            var session = results[0]; canEdit = !!results[1] && results[1].role === "admin";
 			if (!session) { showOnly($authRequired); window.location.replace("page-login.html"); return; }
 			showOnly($loading);
 			supabase.from("audit_clients").select("id, name").eq("id", clientId).maybeSingle()
@@ -151,6 +155,9 @@
 					if (!res.data) { showOnly($clientNotFound); return; }
 					$("#clientTitle").text(res.data.name + " — Brief de marca");
 					buildAccordion();
+                    $(".brief-field").prop("readonly", !canEdit);
+                    $("#saveBriefBtn").toggleClass("d-none", !canEdit);
+                    if (!canEdit) $("#saveStatus").text("Solo lectura");
 					return supabase.from("brand_briefs").select("*").eq("client_id", clientId).maybeSingle();
 				})
 				.then(function (res) {
