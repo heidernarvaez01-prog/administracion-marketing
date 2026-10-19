@@ -29,8 +29,15 @@
 
 		var $name = $("#headerUserName");
 		var $role = $("#headerUserRole");
-		if ($name.length) $name.text(identity.email || "");
-		if ($role.length) $role.text(identity.label || "");
+		if ($name.length) $name.text(identity.email || "").attr("title", identity.email || "");
+		if ($role.length) $role.text(identity.label || "").attr("title", identity.label || "");
+		var $profileMenu = $(".header-profile .dropdown-menu");
+		if ($profileMenu.length) {
+			var $identity = $("<div>", { class: "apache-profile-summary" });
+			$identity.append($("<strong>").text(identity.email || ""));
+			$identity.append($("<small>").text(identity.label || ""));
+			$profileMenu.prepend($identity);
+		}
 
 		var requiredRole = document.body.getAttribute("data-page-access");
 		if (requiredRole && identity.role !== requiredRole) {

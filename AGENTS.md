@@ -1,3 +1,4 @@
 - AI calls in edge functions go through `_shared/openai.ts` `resolveAiEndpoint`: OpenAI if `OPENAI_API_KEY` exists, otherwise Lovable AI Gateway with `LOVABLE_API_KEY` — so AI features work without an extra secret.
 - Meta breakdowns (platform, age/gender, geo) live in their own campaign-day tables and are synced as separate Windsor calls after each full sync: Meta rejects mixing breakdowns with each other or with omni/ranking fields.
 - Manual account creation and password resets run through admin-users after server-validated administrator authorization; never accept roles or memberships in password actions, so credential management cannot grant data access.
+- Eclan product pages share their on-demand navigation and compact session profile through app-menu.js and audit-extras.css, keeping shell layout consistent without per-page duplication.
