@@ -1013,6 +1013,38 @@ export type Database = {
         }
         Relationships: []
       }
+      share_links: {
+        Row: {
+          active: boolean
+          client_id: string
+          created_at: string
+          created_by: string | null
+          token: string
+        }
+        Insert: {
+          active?: boolean
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          token?: string
+        }
+        Update: {
+          active?: boolean
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "audit_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_locks: {
         Row: {
           acquired_at: string
