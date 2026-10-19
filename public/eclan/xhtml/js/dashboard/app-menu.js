@@ -59,6 +59,13 @@
 			}
 		}
 		profile.querySelectorAll('.dropdown-menu a:not(#logoutLink)').forEach(function (link) { link.remove(); });
+		var logout = profile.querySelector("#logoutLink");
+		if (logout) logout.addEventListener("click", function (event) {
+			if (typeof AuditClient === "undefined") return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			AuditClient.signOut();
+		}, true);
 	}
 
 	var SECTIONS = [
