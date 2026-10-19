@@ -10,6 +10,64 @@
 	var menu = document.getElementById("menu");
 	if (!menu) return;
 
+	var wrapper = document.getElementById("main-wrapper");
+	var control = document.querySelector(".nav-control");
+	if (wrapper && control) {
+		wrapper.classList.add("apache-shell");
+		wrapper.classList.remove("right-profile", "menu-toggle");
+		control.setAttribute("role", "button");
+		control.setAttribute("tabindex", "0");
+		control.setAttribute("aria-controls", "menu");
+		function setMenuOpen(open) {
+			wrapper.classList.toggle("apache-menu-open", open);
+			control.setAttribute("aria-expanded", String(open));
+			control.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+			control.setAttribute("title", open ? "Cerrar menú" : "Abrir menú");
+			var hamburger = control.querySelector(".hamburger");
+			if (hamburger) hamburger.classList.toggle("is-active", open);
+		}
+		function toggleMenu(event) {
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			setMenuOpen(!wrapper.classList.contains("apache-menu-open"));
+		}
+		setMenuOpen(false);
+		control.addEventListener("click", toggleMenu, true);
+		control.addEventListener("keydown", function (event) {
+			if (event.key === "Enter" || event.key === " ") toggleMenu(event);
+		});
+		document.addEventListener("keydown", function (event) {
+			if (event.key === "Escape") setMenuOpen(false);
+		});
+		document.addEventListener("click", function (event) {
+			if (!control.contains(event.target) && !menu.closest(".deznav").contains(event.target)) setMenuOpen(false);
+		});
+	}
+
+	var profile = document.querySelector(".header-profile");
+	if (profile) {
+		var trigger = profile.querySelector("a.nav-link");
+		if (trigger) {
+			trigger.setAttribute("aria-label", "Perfil y sesión");
+			trigger.setAttribute("title", "Perfil y sesión");
+			var photo = trigger.querySelector("img");
+			if (photo) {
+				var icon = document.createElement("i");
+				icon.className = "fa fa-user-circle apache-profile-icon";
+				icon.setAttribute("aria-hidden", "true");
+				photo.replaceWith(icon);
+			}
+		}
+		profile.querySelectorAll('.dropdown-menu a:not(#logoutLink)').forEach(function (link) { link.remove(); });
+		var logout = profile.querySelector("#logoutLink");
+		if (logout) logout.addEventListener("click", function (event) {
+			if (typeof AuditClient === "undefined") return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			AuditClient.signOut();
+		}, true);
+	}
+
 	var SECTIONS = [
 		{ label: "Resultados", icon: "flaticon-381-networking", items: [
 			{ href: "index.html", text: "Dashboard" },

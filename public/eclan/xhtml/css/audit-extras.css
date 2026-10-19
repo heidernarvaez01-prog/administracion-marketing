@@ -142,3 +142,36 @@ tr.audit-row[aria-expanded="true"] td:first-child i.audit-chevron { transform: r
 	.widget-stat .media .media-body h1.fs-36 { font-size: 22px !important; white-space: nowrap; }
 }
 .widget-stat .media .media-body p { hyphens: auto; }
+
+/* Espacio compartido: navegación a demanda y perfil solo en la cabecera. */
+.apache-shell {
+	--shell-brand-width: 17rem;
+	--shell-control-width: 3.75rem;
+	--shell-profile-width: 18rem;
+	--shell-profile-icon-size: 1.75rem;
+	--shell-profile-gap: .75rem;
+	--shell-profile-padding: 1rem;
+}
+#main-wrapper.apache-shell .profile-sidebar { display: none !important; }
+#main-wrapper.apache-shell .content-body,
+#main-wrapper.apache-shell .footer { margin-left: 0 !important; margin-right: 0 !important; }
+#main-wrapper.apache-shell .header { padding-left: var(--shell-brand-width) !important; padding-right: 0 !important; width: 100%; }
+#main-wrapper.apache-shell .nav-header { width: var(--shell-brand-width); }
+#main-wrapper.apache-shell .deznav { display: none; }
+#main-wrapper.apache-shell.apache-menu-open .deznav { display: block; position: fixed; height: 100vh; }
+#main-wrapper.apache-shell .header-profile { min-width: 0; }
+#main-wrapper.apache-shell .header-profile .nav-link { display: flex; gap: var(--shell-profile-gap); }
+#main-wrapper.apache-shell .header-profile .header-info { display: block; min-width: 0; max-width: var(--shell-profile-width); margin-right: 0; }
+#main-wrapper.apache-shell .header-info span,
+#main-wrapper.apache-shell .header-info small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#main-wrapper.apache-shell .apache-profile-icon { font-size: var(--shell-profile-icon-size); flex: none; color: var(--bs-primary); }
+#main-wrapper.apache-shell .header-profile .dropdown-menu { width: var(--shell-profile-width); max-width: calc(100vw - var(--shell-profile-padding)); }
+.apache-profile-summary { padding: var(--shell-profile-padding); border-bottom: 1px solid var(--bs-border-color, currentColor); }
+.apache-profile-summary strong, .apache-profile-summary small { display: block; overflow-wrap: anywhere; }
+@media only screen and (max-width: 767px) {
+	#main-wrapper.apache-shell { --shell-brand-width: 5rem; }
+	#main-wrapper.apache-shell .header-profile .header-info { display: none; }
+	#main-wrapper.apache-shell .header-left { min-width: 0; overflow: hidden; }
+	#main-wrapper.apache-shell .nav-control { right: 0; width: var(--shell-control-width); }
+	#main-wrapper.apache-shell .nav-header .brand-logo { visibility: hidden; }
+}
