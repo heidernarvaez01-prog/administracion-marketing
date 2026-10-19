@@ -270,7 +270,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Límite de uso alcanzado. Intenta de nuevo en unos segundos." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       console.error("OpenAI error", result.error);
-      return new Response(JSON.stringify({ error: "Error del servicio de IA" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: result.error || "Error del servicio de IA" }), { status: result.status || 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(

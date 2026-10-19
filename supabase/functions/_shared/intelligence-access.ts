@@ -1,7 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-export function intelligenceOperationAllowed(admin: boolean, operation: string): boolean {
-  return admin || ['read', 'preview', 'ask'].includes(operation);
-}
+export { intelligenceOperationAllowed } from './intelligence-policy.ts';
 export async function clientAccess(authorization: string, clientId: string) {
   const url = Deno.env.get('SUPABASE_URL');
   const key = Deno.env.get('SUPABASE_ANON_KEY');
