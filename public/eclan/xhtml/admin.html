@@ -1009,8 +1009,23 @@
 					<ul class="nav nav-tabs mt-2" role="tablist">
 						<li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tabEquipo">Equipo</a></li>
 						<li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabClientesAgencias">Clientes y Agencias</a></li>
+						<li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tabCompartir">Enlaces para compartir</a></li>
 					</ul>
 					<div class="tab-content pt-3">
+
+					<div class="tab-pane fade" id="tabCompartir">
+						<div class="card">
+							<div class="card-header"><h4 class="card-title">Enlaces para compartir</h4></div>
+							<div class="card-body">
+								<p class="fs-13 text-muted">Quien tenga el enlace ve el Dashboard de ese cliente sin iniciar sesión, solo para mirar. Desactívalo cuando quieras y deja de funcionar al instante.</p>
+								<div class="row g-2 align-items-end mb-3">
+									<div class="col-md-8"><label class="form-label fs-13">Cliente</label><select class="form-control" id="shareClient"></select></div>
+									<div class="col-md-4"><button type="button" class="btn btn-primary w-100" id="shareCreate">Crear enlace</button></div>
+								</div>
+								<div class="table-responsive"><table class="table mb-0"><thead><tr><th>Cliente</th><th>Enlace</th><th>Estado</th><th></th></tr></thead><tbody id="shareList"></tbody></table></div>
+							</div>
+						</div>
+					</div>
 
 					<div class="tab-pane fade show active" id="tabEquipo">
 					<!-- Stat tiles -->
@@ -1164,6 +1179,7 @@
 	<script src="js/dashboard/role-ui.js"></script>
 	<script src="js/dashboard/admin.js"></script>
 	<script src="js/dashboard/admin-clientes.js"></script>
+	<script src="js/dashboard/admin-compartir.js"></script>
 
 </body>
 </html>
