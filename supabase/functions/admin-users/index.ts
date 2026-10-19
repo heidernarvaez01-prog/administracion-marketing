@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { sendEmail, sharedCorsHeaders as corsHeaders } from '../_shared/email.ts';
 import { buildInviteEmail, buildPasswordResetEmail } from './_templates.ts';
 import { isAdminRole, manualAccountAction } from './manual-accounts.ts';
+import { validAccessChange } from './access-actions.ts';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -143,7 +144,15 @@ async function handleList(admin: SupabaseClient) {
       last_sign_in_at: u.last_sign_in_at,
       confirmed: !!u.email_confirmed_at || !!u.confirmed_at,
     }));
-  return json({ users });
+  const results = await Promise.all([
+    admin.from('agency_members').select('agency_id,user_id,role'),
+    admin.from('client_members').select('client_id,user_id,role'),
+    admin.from('agencies').select('id,name'),
+    admin.from('audit_clients').select('id,name'),
+  ]);
+  for (const result of results) if (result.error) throw result.error;
+  return json({ users, agencyMembers: results[0].data, clientMembers: results[1].data,
+    agencies: results[2].data, clients: results[3].data });
 }
 
 Deno.serve(async (req) => {
@@ -158,6 +167,23 @@ Deno.serve(async (req) => {
     const action = (body?.action as string) || 'list';
 
     switch (action) {
+      case 'change_access': {
+        if (!validAccessChange(body)) return json({ error: 'Acceso inválido. Solo viewer o manager.' }, 400);
+        const { data: targetRole } = await auth.admin.from('user_roles').select('role').eq('user_id', body.userId).eq('role', 'admin').maybeSingle();
+        if (targetRole || body.userId === auth.userId) return json({ error: 'No se modifica el acceso del administrador.' }, 403);
+        const { data: target, error: targetError } = await auth.admin.auth.admin.getUserById(body.userId);
+        if (targetError || !target.user) return json({ error: 'Usuario no encontrado.' }, 404);
+        const manager = body.accessRole === 'manager';
+        const table = manager ? 'agency_members' : 'client_members';
+        const scope = manager ? 'agency_id' : 'client_id';
+        const { data: resource } = await auth.admin.from(manager ? 'agencies' : 'audit_clients').select('id').eq('id', body.scopeId).maybeSingle();
+        if (!resource) return json({ error: 'Agencia o cliente no encontrado.' }, 404);
+        const result = body.operation === 'remove'
+          ? await auth.admin.from(table).delete().eq('user_id', body.userId).eq(scope, body.scopeId)
+          : await auth.admin.from(table).upsert({ user_id: body.userId, [scope]: body.scopeId, role: body.accessRole });
+        if (result.error) throw result.error;
+        return json({ ok: true });
+      }
       case 'create_user':
       case 'set_password': {
         const result = await manualAccountAction(auth.admin, body);
