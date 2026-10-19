@@ -27,7 +27,15 @@
     var accessData = {};
 
 	function isAdminUser(uid) { return roles.some(function (r) { return r.user_id === uid && r.role === "admin"; }); }
-	function assignmentsFor(uid) { return assignments.filter(function (a) { return a.user_id === uid; }); }
+	function assignmentsFor(uid) {
+        var visibleClientIds = (accessData.clientMembers || []).filter(function(m) { return m.user_id === uid; }).map(function(m) { return m.client_id; });
+        var agencies = (accessData.agencyMembers || []).filter(function(m) { return m.user_id === uid; }).map(function(m) { return m.agency_id; });
+        (accessData.clients || []).forEach(function(c) { if (agencies.includes(c.agency_id)) visibleClientIds.push(c.id); });
+        var ids = (accessData.clientAccounts || []).filter(function(c) { return visibleClientIds.includes(c.client_id) || isAdminUser(uid); }).map(function(c) { return c.account_id; });
+        var result = assignments.filter(function (a) { return a.user_id === uid; });
+        (accessData.accounts || []).forEach(function(a) { if (ids.includes(a.account_id) && !result.some(function(r) { return r.account_id === a.account_id; })) result.push(a); });
+        return result;
+    }
 
     function accessLabel(uid) {
         var labels = [];
@@ -93,6 +101,7 @@
 				'<td><span class="badge ' + (admin ? "bg-primary" : "bg-light text-dark") + '">' + (admin ? "Administrador" : accessLabel(u.id)) + "</span></td>" +
 				"<td>" + accHtml + "</td>" +
 				'<td class="text-end">' +
+                (!admin ? '<a href="javascript:;" class="btn btn-outline-primary btn-sm change-access-btn me-2" data-id="' + u.id + '">Cambiar acceso</a>' : '') +
 				'<div class="dropdown"><a href="javascript:;" data-bs-toggle="dropdown"><i class="fa fa-ellipsis-v"></i></a>' +
 				'<div class="dropdown-menu dropdown-menu-end">' +
                 (!admin ? '<a href="javascript:;" class="dropdown-item change-access-btn" data-id="' + u.id + '">Cambiar acceso</a>' : '') +
@@ -133,7 +142,7 @@
         }).catch(function(err) {
             $('#membersTableBody').empty();
             $('#membersLoadError').remove();
-            $('<div>', { id: 'membersLoadError', class: 'alert alert-danger', text: err.message }).append($('<button>', { type:'button', class:'btn btn-light btn-sm ms-2', text:'Volver a cargar' }).on('click', loadData)).insertBefore('#membersTableBody');
+            $('<div>', { id: 'membersLoadError', class: 'alert alert-danger', text: err.message }).append($('<button>', { type:'button', class:'btn btn-light btn-sm ms-2', text:'Volver a cargar' }).on('click', loadData)).insertBefore($('#membersTableBody').closest('.table-responsive'));
         });
 	}
 

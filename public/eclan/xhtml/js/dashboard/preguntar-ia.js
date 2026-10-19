@@ -111,6 +111,7 @@
 	function ask(question) {
 		question = (question || "").trim();
 		if (!question || loading) return;
+        $('#chatError').remove();
 		messages.push({ role: "user", content: question });
 		$("#questionInput").val("");
 		loading = true;
@@ -136,7 +137,7 @@
 				messages.push({ role: "assistant", content: result.data.answer });
 			})
 			.catch(function (err) {
-				alert((err && err.message) || "Falló el análisis");
+				$('<div>', { id: 'chatError', role:'alert', class:'alert alert-danger', text:(err && err.message) || 'Falló el análisis' }).insertBefore('#askForm');
 				messages.pop();
 			})
 			.then(function () {

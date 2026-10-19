@@ -149,10 +149,13 @@ async function handleList(admin: SupabaseClient) {
     admin.from('client_members').select('client_id,user_id,role'),
     admin.from('agencies').select('id,name'),
     admin.from('audit_clients').select('id,name'),
+    admin.from('client_accounts').select('client_id,account_id'),
+    admin.from('ad_accounts').select('account_id,account_name'),
   ]);
   for (const result of results) if (result.error) throw result.error;
   return json({ users, agencyMembers: results[0].data, clientMembers: results[1].data,
-    agencies: results[2].data, clients: results[3].data });
+    agencies: results[2].data, clients: results[3].data,
+    clientAccounts: results[4].data, accounts: results[5].data });
 }
 
 Deno.serve(async (req) => {
@@ -169,7 +172,8 @@ Deno.serve(async (req) => {
     switch (action) {
       case 'change_access': {
         if (!validAccessChange(body)) return json({ error: 'Acceso inválido. Solo viewer o manager.' }, 400);
-        const { data: targetRole } = await auth.admin.from('user_roles').select('role').eq('user_id', body.userId).eq('role', 'admin').maybeSingle();
+        const { data: targetRole, error: roleError } = await auth.admin.from('user_roles').select('role').eq('user_id', body.userId).eq('role', 'admin').maybeSingle();
+        if (roleError) throw roleError;
         if (targetRole || body.userId === auth.userId) return json({ error: 'No se modifica el acceso del administrador.' }, 403);
         const { data: target, error: targetError } = await auth.admin.auth.admin.getUserById(body.userId);
         if (targetError || !target.user) return json({ error: 'Usuario no encontrado.' }, 404);
