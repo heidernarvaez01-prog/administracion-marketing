@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Apache 360 · Resultados</title>
+<link href="css/style.css" rel="stylesheet">
+<style>
+body{background:#f4f5f9}
+.wrap{max-width:1200px;margin:0 auto;padding:24px 16px}
+.kpi h3{margin:0;font-size:clamp(18px,2.4vw,26px);overflow-wrap:anywhere}
+.kpi p{margin:0 0 4px;color:#777;font-size:13px}
+.periods .btn{margin-left:6px}
+td,th{font-size:14px}
+.text-ov{max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
+    <div>
+      <div class="fw-bold fs-4 text-black">Apache 360</div>
+      <h2 class="mb-0" id="clientName">Cargando…</h2>
+      <small class="text-muted" id="rangeLabel"></small>
+    </div>
+    <div class="periods">
+      <button class="btn btn-sm btn-outline-primary" data-days="7">7 días</button>
+      <button class="btn btn-sm btn-primary" data-days="30">30 días</button>
+      <button class="btn btn-sm btn-outline-primary" data-days="90">90 días</button>
+    </div>
+  </div>
+  <div id="error" class="alert alert-danger d-none"></div>
+  <div id="content" class="d-none">
+    <div class="row" id="kpis"></div>
+    <div class="row">
+      <div class="col-lg-6"><div class="card"><div class="card-header"><h4 class="card-title">Campañas</h4></div><div class="card-body table-responsive" id="campaigns"></div></div></div>
+      <div class="col-lg-6"><div class="card"><div class="card-header"><h4 class="card-title">Anuncios con más gasto</h4></div><div class="card-body table-responsive" id="ads"></div></div></div>
+      <div class="col-lg-4"><div class="card"><div class="card-header"><h4 class="card-title">Facebook vs Instagram</h4></div><div class="card-body table-responsive" id="platform"></div></div></div>
+      <div class="col-lg-4"><div class="card"><div class="card-header"><h4 class="card-title">Género</h4></div><div class="card-body table-responsive" id="gender"></div></div></div>
+      <div class="col-lg-4"><div class="card"><div class="card-header"><h4 class="card-title">Edad</h4></div><div class="card-body table-responsive" id="age"></div></div></div>
+      <div class="col-lg-12"><div class="card"><div class="card-header"><h4 class="card-title">Regiones con más gasto</h4></div><div class="card-body table-responsive" id="region"></div></div></div>
+    </div>
+  </div>
+</div>
+<script src="js/dashboard/compartir.js"></script>
+</body>
+</html>
