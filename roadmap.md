@@ -4,5 +4,5 @@
 - [x] Desplegar y verificar creación, cambio de contraseña, ingreso y aislamiento con cuentas de prueba.
 
 # Espacio del Dashboard
-- [ ] Ocultar el menú al iniciar y compactar el perfil sin columna lateral.
-- [ ] Verificar menú, perfil y distribución con sesión real.
+- [x] Ocultar el menú al iniciar y compactar el perfil sin columna lateral.
+- [x] Verificar menú, perfil y distribución con sesión real.
