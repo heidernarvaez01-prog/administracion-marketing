@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { sendEmail, sharedCorsHeaders as corsHeaders } from '../_shared/email.ts';
 import { buildInviteEmail, buildPasswordResetEmail } from './_templates.ts';
+import { isAdminRole, manualAccountAction } from './manual-accounts.ts';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -18,10 +19,12 @@ interface Env {
 }
 
 function env(): Env {
+  const url = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!url || !serviceKey || !anonKey) throw new Error('Auth configuration unavailable');
   return {
-    url: Deno.env.get('SUPABASE_URL')!,
-    serviceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    anonKey: Deno.env.get('SUPABASE_ANON_KEY')!,
+    url, serviceKey, anonKey,
   };
 }
 
@@ -46,7 +49,7 @@ async function requireAdmin(req: Request): Promise<
     .eq('user_id', user.id)
     .eq('role', 'admin')
     .maybeSingle();
-  if (!role) return { ok: false, response: json({ error: 'Forbidden: admin only' }, 403) };
+  if (!isAdminRole(role)) return { ok: false, response: json({ error: 'Forbidden: admin only' }, 403) };
 
   return { ok: true, admin, userId: user.id, userEmail: user.email ?? null };
 }
@@ -88,7 +91,7 @@ async function handleInvite(admin: SupabaseClient, body: any, inviterEmail: stri
       : { sent: false, reason: `resend_${result.status ?? 'error'}` };
   }
 
-  return json({ ok: true, userId: data?.user?.id, actionLink, email: emailResult });
+  return json({ ok: true, userId: data?.user?.id, email: emailResult });
 }
 
 async function handleDeleteUser(admin: SupabaseClient, body: any, callerId: string) {
@@ -125,7 +128,7 @@ async function handleResetPassword(admin: SupabaseClient, body: any) {
       : { sent: false, reason: `resend_${result.status ?? 'error'}` };
   }
 
-  return json({ ok: true, actionLink, email: emailResult });
+  return json({ ok: true, email: emailResult });
 }
 
 async function handleList(admin: SupabaseClient) {
@@ -145,6 +148,7 @@ async function handleList(admin: SupabaseClient) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'GET' && req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
     const auth = await requireAdmin(req);
@@ -154,6 +158,11 @@ Deno.serve(async (req) => {
     const action = (body?.action as string) || 'list';
 
     switch (action) {
+      case 'create_user':
+      case 'set_password': {
+        const result = await manualAccountAction(auth.admin, body);
+        return json(result.body, result.status);
+      }
       case 'invite':
         return await handleInvite(auth.admin, body, auth.userEmail);
       case 'delete_user':
