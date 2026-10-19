@@ -6,3 +6,8 @@
 # Espacio del Dashboard
 - [x] Ocultar el menú al iniciar y compactar el perfil sin columna lateral.
 - [x] Verificar menú, perfil y distribución con sesión real.
+
+# Miembros e Inteligencia
+- [ ] Recuperar la lista de miembros y controles de cambio de rol para el administrador.
+- [ ] Permitir a viewers usar Inteligencia sin editar ni acceder a otros clientes.
+- [ ] Verificar respuestas de IA basadas en datos reales y aislamiento de acceso.
