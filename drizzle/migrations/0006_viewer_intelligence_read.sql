@@ -1,0 +1,5 @@
+GRANT SELECT ON public.brand_briefs, public.cluster_runs, public.weekly_reports TO authenticated;
+GRANT ALL ON public.brand_briefs, public.cluster_runs, public.weekly_reports TO service_role;
+CREATE POLICY "Assigned clients read intelligence" ON public.brand_briefs FOR SELECT TO authenticated USING (has_role(auth.uid(), 'admin') OR is_client_member(client_id) OR is_client_agency_manager(client_id));
+CREATE POLICY "Assigned clients read intelligence" ON public.cluster_runs FOR SELECT TO authenticated USING (has_role(auth.uid(), 'admin') OR is_client_member(client_id) OR is_client_agency_manager(client_id));
+CREATE POLICY "Assigned clients read intelligence" ON public.weekly_reports FOR SELECT TO authenticated USING (has_role(auth.uid(), 'admin') OR is_client_member(client_id) OR is_client_agency_manager(client_id));
