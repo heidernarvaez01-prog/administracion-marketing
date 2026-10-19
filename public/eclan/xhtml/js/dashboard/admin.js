@@ -5,12 +5,7 @@
 	var supabase = AuditClient.supabase;
 	var currentUserId = null;
 
-	// Mientras Eclan no tenga su propia pantalla para elegir contraseña
-	// (page-set-password.html, propuesta pendiente de aprobar), el link de
-	// invitación/reset tiene que caer en /app/auth: es la única pantalla que
-	// sabe procesar el token (verifyOtp/exchangeCodeForSession) y llamar a
-	// supabase.auth.updateUser. page-login.html no tiene ese paso.
-	var REDIRECT_TO = window.location.origin + "/app/auth"; // mismo que admin-clientes.js
+	var REDIRECT_TO = window.location.origin + "/eclan/xhtml/page-set-password.html";
 
 	var $loading = $("#adminLoading");
 	var $content = $("#adminContent");
@@ -64,7 +59,7 @@
 				'<td class="text-end">' +
 				'<div class="dropdown"><a href="javascript:;" data-bs-toggle="dropdown"><i class="fa fa-ellipsis-v"></i></a>' +
 				'<div class="dropdown-menu dropdown-menu-end">' +
-				'<a href="javascript:;" class="dropdown-item toggle-admin-btn" data-id="' + u.id + '">' + (admin ? "Quitar admin" : "Hacer admin") + "</a>" +
+				'<a href="javascript:;" class="dropdown-item set-password-btn" data-id="' + u.id + '" data-email="' + escapeHtml(u.email) + '">Establecer contraseña</a>' +
 				'<a href="javascript:;" class="dropdown-item send-reset-btn" data-email="' + escapeHtml(u.email) + '">Enviar reset de contraseña</a>' +
 				'<a href="javascript:;" class="dropdown-item resend-invite-btn" data-email="' + escapeHtml(u.email) + '">Reenviar invitación</a>' +
 				'<a href="javascript:;" class="dropdown-item text-danger revoke-access-btn" data-id="' + u.id + '" data-email="' + escapeHtml(u.email) + '">Revocar acceso</a>' +
@@ -97,70 +92,108 @@
 		});
 	}
 
+	function invokeAdmin(body) {
+		return supabase.functions.invoke("admin-users", { body: body }).then(async function (res) {
+			if (res.error) {
+				var detail = null;
+				if (res.error.context && typeof res.error.context.json === "function") {
+					try { detail = await res.error.context.json(); } catch (_err) {}
+				}
+				throw new Error((detail && detail.error) || res.error.message || "No se pudo guardar.");
+			}
+			if (!res.data || res.data.error) throw new Error((res.data && res.data.error) || "Respuesta inválida.");
+			return res.data;
+		});
+	}
+	function requireDelivery(data) {
+		if (!data.email || !data.email.sent) throw new Error("El correo no se envió. Puedes establecer la contraseña directamente en Equipo.");
+		return data;
+	}
+	function passwordError(pw, confirmation) {
+		if (pw.length < 8 || pw.length > 128) return "La contraseña debe tener entre 8 y 128 caracteres.";
+		if (pw !== confirmation) return "Las contraseñas no coinciden.";
+		return null;
+	}
+	$("#accountMethod").on("change", function () {
+		var manual = $(this).val() === "manual";
+		$(".manual-password-field").toggleClass("d-none", !manual);
+		$("#formPassword, #formPasswordConfirm").val("");
+		$("#submitFormBtn").text(manual ? "Crear cuenta" : "Enviar invitación");
+	});
 	$("#submitFormBtn").on("click", function () {
 		var email = $("#formEmail").val().trim().toLowerCase();
-		var role = $("#formRole").val();
+		var manual = $("#accountMethod").val() === "manual";
+		var pw = $("#formPassword").val(), confirmation = $("#formPasswordConfirm").val();
 		var $err = $("#formError").addClass("d-none");
-
+		$("#formSuccess").addClass("d-none");
 		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { $err.text("Correo inválido.").removeClass("d-none"); return; }
-
 		var existing = users.filter(function (u) { return (u.email || "").toLowerCase() === email; })[0];
-		var uidPromise;
-		if (existing) {
-			uidPromise = Promise.resolve(existing.id);
-		} else {
-			uidPromise = supabase.functions.invoke("admin-users", { body: { action: "invite", email: email, redirectTo: REDIRECT_TO } })
-				.then(function (res) {
-					if (res.error || (res.data && res.data.error)) throw new Error((res.error && res.error.message) || (res.data && res.data.error) || "No se pudo enviar la invitación");
-					return loadData().then(function () {
-						var found = users.filter(function (u) { return (u.email || "").toLowerCase() === email; })[0];
-						return found ? found.id : null;
-					});
-				});
-		}
-
-		uidPromise.then(function (uid) {
-			if (!uid) throw new Error("No se pudo identificar al miembro después de invitarlo.");
-			var chain = Promise.resolve();
-			if (role === "admin" && !isAdminUser(uid)) {
-				chain = chain.then(function () { return supabase.from("user_roles").insert({ user_id: uid, role: "admin" }); });
-			} else if (role === "user") {
-				chain = chain.then(function () { return supabase.from("user_roles").upsert({ user_id: uid, role: "user" }, { onConflict: "user_id,role" }); });
-			}
-			return chain;
-		}).then(function () {
+		if (manual && existing) { $err.text("La cuenta ya existe. Usa Establecer contraseña en su fila.").removeClass("d-none"); return; }
+		var validation = manual ? passwordError(pw, confirmation) : null;
+		if (validation) { $err.text(validation).removeClass("d-none"); return; }
+		var $btn = $(this).prop("disabled", true).text("Guardando…");
+		invokeAdmin(manual ? { action: "create_user", email: email, password: pw, passwordConfirmation: confirmation }
+			: { action: "invite", email: email, redirectTo: REDIRECT_TO }).then(function (data) {
+			$("#formPassword, #formPasswordConfirm").val("");
+			if (!manual) requireDelivery(data);
 			$("#formEmail").val("");
-			$("#formRole").val("user");
-			return loadData();
+			$("#formSuccess").text(manual ? "Cuenta creada. Asígnala al cliente en Clientes y Agencias." : "Invitación enviada.").removeClass("d-none");
 		}).catch(function (err) {
-			$err.text((err && err.message) || "Error inesperado.").removeClass("d-none");
+			$err.text(err.message || "No se pudo guardar.").removeClass("d-none");
+		}).finally(function () {
+			$("#formPassword, #formPasswordConfirm").val("");
+			$btn.prop("disabled", false).text(manual ? "Crear cuenta" : "Enviar invitación");
+			loadData();
+			$(document).trigger("apache360:users-changed");
+		});
+	});
+	var passwordTargetId = null;
+	var passwordModalEl = document.getElementById("passwordModal");
+	$(document).on("click", ".set-password-btn", function (e) {
+		e.preventDefault();
+		passwordTargetId = $(this).data("id");
+		$("#adminPasswordForm")[0].reset();
+		$("#passwordFormError").addClass("d-none").text("");
+		$("#passwordTargetEmail").text($(this).data("email"));
+		bootstrap.Modal.getOrCreateInstance(passwordModalEl).show();
+	});
+	$(passwordModalEl).on("hidden.bs.modal", function () {
+		passwordTargetId = null;
+		$("#adminPasswordForm")[0].reset();
+		$("#passwordTargetEmail").text("");
+	});
+	$("#adminPasswordForm").on("submit", function (e) {
+		e.preventDefault();
+		var pw = $("#adminNewPassword").val(), confirmation = $("#adminConfirmPassword").val();
+		var validation = passwordError(pw, confirmation);
+		if (!passwordTargetId || !$("#confirmPasswordChange").prop("checked")) return;
+		if (validation) { $("#passwordFormError").text(validation).removeClass("d-none"); return; }
+		$("#passwordFormError").addClass("d-none");
+		$("#savePasswordBtn").prop("disabled", true).text("Guardando…");
+		invokeAdmin({ action: "set_password", userId: passwordTargetId, password: pw, passwordConfirmation: confirmation }).then(function () {
+			bootstrap.Modal.getOrCreateInstance(passwordModalEl).hide();
+			$("#formSuccess").text("Contraseña guardada. La cuenta puede entrar con su correo y la nueva contraseña.").removeClass("d-none");
+			loadData();
+			$(document).trigger("apache360:users-changed");
+		}).catch(function (err) {
+			$("#passwordFormError").text(err.message || "No se pudo guardar.").removeClass("d-none");
+		}).finally(function () {
+			$("#adminNewPassword, #adminConfirmPassword").val("");
+			$("#savePasswordBtn").prop("disabled", false).text("Guardar contraseña");
 		});
 	});
 
-	$(document).on("click", ".toggle-admin-btn", function () {
-		var uid = $(this).data("id");
-		var chain = isAdminUser(uid)
-			? supabase.from("user_roles").delete().eq("user_id", uid).eq("role", "admin")
-			: supabase.from("user_roles").insert({ user_id: uid, role: "admin" });
-		chain.then(function (res) { if (res.error) { alert("Error: " + res.error.message); return; } loadData(); });
-	});
-
-	$(document).on("click", ".send-reset-btn", function () {
+	$(document).on("click", ".send-reset-btn, .resend-invite-btn", function (e) {
+		e.preventDefault();
 		var email = $(this).data("email");
-		supabase.functions.invoke("admin-users", { body: { action: "reset_password", email: email, redirectTo: REDIRECT_TO } })
-			.then(function (res) {
-				if (res.error || (res.data && res.data.error)) { alert("No se pudo enviar el link."); return; }
-				alert("Link de reseteo enviado a " + email);
-			});
-	});
-
-	$(document).on("click", ".resend-invite-btn", function () {
-		var email = $(this).data("email");
-		supabase.functions.invoke("admin-users", { body: { action: "invite", email: email, redirectTo: REDIRECT_TO } })
-			.then(function (res) {
-				if (res.error || (res.data && res.data.error)) { alert("No se pudo reenviar."); return; }
-				alert("Invitación reenviada a " + email);
-			});
+		var action = $(this).hasClass("send-reset-btn") ? "reset_password" : "invite";
+		invokeAdmin({ action: action, email: email, redirectTo: REDIRECT_TO }).then(requireDelivery).then(function () {
+			$("#formError").addClass("d-none");
+			$("#formSuccess").text("Correo enviado a " + email).removeClass("d-none");
+		}).catch(function (err) {
+			$("#formSuccess").addClass("d-none");
+			$("#formError").text(err.message).removeClass("d-none");
+		});
 	});
 
 	$(document).on("click", ".revoke-access-btn", function () {
