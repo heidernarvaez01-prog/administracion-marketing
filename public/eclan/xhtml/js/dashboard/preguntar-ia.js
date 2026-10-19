@@ -85,17 +85,22 @@
 	function loadClients() {
 		supabase.from("audit_clients").select("id, name").order("name").then(function (res) {
 			clients = res.data || [];
-			$("#scopeClient").html('<option value="">Todos los clientes</option>' + clients.map(function (c) {
+			$("#scopeClient").html('<option value="">Mis clientes permitidos</option>' + clients.map(function (c) {
 				return '<option value="' + c.id + '">' + escapeHtml(c.name) + "</option>";
 			}).join(""));
-		});
-	}
+            var selected = null; try { selected = localStorage.getItem('apache360.selectedClientId'); } catch(e) {}
+            if (clients.some(function(c) { return c.id === selected; })) $('#scopeClient').val(selected);
+            else if (clients.length === 1) $('#scopeClient').val(clients[0].id);
+            $('#scopeClient').trigger('change');
+        });
+    }
 
 	$("#scopeClient").on("change", function () {
-		var clientId = $(this).val();
+		messages = []; renderMessages(); renderSuggestions();
+        var clientId = $(this).val();
 		var $campaign = $("#scopeCampaign");
 		if (!clientId) { $campaign.html('<option value="">Todas las campañas</option>').prop("disabled", true); return; }
-		supabase.from("audit_records").select("campaign_name").eq("client_id", clientId).then(function (res) {
+		supabase.rpc("meta_campaign_totals", { _days: 90, _client_id: clientId }).then(function (res) {
 			var names = Array.from(new Set((res.data || []).map(function (r) { return r.campaign_name; }).filter(Boolean))).sort();
 			$campaign.html('<option value="">Todas las campañas</option>' + names.map(function (n) {
 				return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + "</option>";
@@ -123,7 +128,7 @@
 					Authorization: "Bearer " + (session ? session.access_token : SUPABASE_ANON_KEY),
 					apikey: SUPABASE_ANON_KEY,
 				},
-				body: JSON.stringify({ question: question, clientId: clientId, campaignName: campaignName }),
+				body: JSON.stringify({ question: question, clientId: clientId, campaignName: campaignName, history: messages.slice(0, -1) }),
 			});
 		}).then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
 			.then(function (result) {

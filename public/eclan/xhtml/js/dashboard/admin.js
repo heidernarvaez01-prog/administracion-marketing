@@ -24,9 +24,45 @@
 	}
 
 	var users = [], accounts = [], assignments = [], roles = [];
+    var accessData = {};
 
 	function isAdminUser(uid) { return roles.some(function (r) { return r.user_id === uid && r.role === "admin"; }); }
 	function assignmentsFor(uid) { return assignments.filter(function (a) { return a.user_id === uid; }); }
+
+    function accessLabel(uid) {
+        var labels = [];
+        (accessData.agencyMembers || []).filter(function(m) { return m.user_id === uid; }).forEach(function(m) {
+            var agency = (accessData.agencies || []).find(function(a) { return a.id === m.agency_id; });
+            labels.push('Manager · ' + escapeHtml(agency ? agency.name : 'Agencia'));
+        });
+        (accessData.clientMembers || []).filter(function(m) { return m.user_id === uid; }).forEach(function(m) {
+            var client = (accessData.clients || []).find(function(a) { return a.id === m.client_id; });
+            labels.push('Viewer · ' + escapeHtml(client ? client.name : 'Cliente'));
+        });
+        return labels.join('<br>') || 'Sin acceso';
+    }
+    var accessTarget = null;
+    $('body').append('<div class="modal fade" id="memberAccessModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Cambiar acceso</h5><button class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div><div class="modal-body"><p id="memberAccessEmail"></p><div id="memberAccessError" class="alert alert-danger d-none"></div><label class="form-label" for="memberAccessRole">Rol</label><select id="memberAccessRole" class="form-control mb-3"><option value="viewer">Viewer de cliente</option><option value="manager">Manager de agencia</option></select><label class="form-label" for="memberAccessScope">Cliente o agencia</label><select id="memberAccessScope" class="form-control mb-3"></select><label class="form-label" for="memberAccessOperation">Acción</label><select id="memberAccessOperation" class="form-control"><option value="grant">Asignar acceso</option><option value="remove">Retirar acceso</option></select></div><div class="modal-footer"><button id="saveMemberAccess" class="btn btn-primary">Guardar acceso</button></div></div></div></div>');
+    function accessScopes() {
+        var items = $('#memberAccessRole').val() === 'manager' ? accessData.agencies : accessData.clients;
+        $('#memberAccessScope').empty();
+        (items || []).forEach(function(item) { $('#memberAccessScope').append($('<option>', { value:item.id, text:item.name })); });
+    }
+    $('#memberAccessRole').on('change', accessScopes);
+    $(document).on('click', '.change-access-btn', function() {
+        accessTarget = $(this).data('id');
+        var user = users.find(function(u) { return u.id === accessTarget; });
+        $('#memberAccessEmail').text(user ? user.email : '');
+        $('#memberAccessError').addClass('d-none');
+        accessScopes(); bootstrap.Modal.getOrCreateInstance(document.getElementById('memberAccessModal')).show();
+    });
+    $('#saveMemberAccess').on('click', function() {
+        var button = $(this).prop('disabled', true);
+        invokeAdmin({ action:'change_access', userId:accessTarget, accessRole:$('#memberAccessRole').val(), scopeId:$('#memberAccessScope').val(), operation:$('#memberAccessOperation').val() }).then(function() {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('memberAccessModal')).hide();
+            $(document).trigger('apache360:users-changed'); return loadData();
+        }).catch(function(err) { $('#memberAccessError').text(err.message).removeClass('d-none'); }).finally(function() { button.prop('disabled', false); });
+    });
 
 	function renderStats() {
 		function tile(label, value, icon, bg) {
@@ -54,11 +90,12 @@
 			return (
 				"<tr>" +
 				"<td>" + escapeHtml(u.email) + (u.confirmed === false ? ' <span class="badge bg-light text-muted">Invitado</span>' : "") + "</td>" +
-				'<td><span class="badge ' + (admin ? "bg-primary" : "bg-light text-dark") + '">' + (admin ? "Admin" : "Miembro") + "</span></td>" +
+				'<td><span class="badge ' + (admin ? "bg-primary" : "bg-light text-dark") + '">' + (admin ? "Administrador" : accessLabel(u.id)) + "</span></td>" +
 				"<td>" + accHtml + "</td>" +
 				'<td class="text-end">' +
 				'<div class="dropdown"><a href="javascript:;" data-bs-toggle="dropdown"><i class="fa fa-ellipsis-v"></i></a>' +
 				'<div class="dropdown-menu dropdown-menu-end">' +
+                (!admin ? '<a href="javascript:;" class="dropdown-item change-access-btn" data-id="' + u.id + '">Cambiar acceso</a>' : '') +
 				'<a href="javascript:;" class="dropdown-item set-password-btn" data-id="' + u.id + '" data-email="' + escapeHtml(u.email) + '">Establecer contraseña</a>' +
 				'<a href="javascript:;" class="dropdown-item send-reset-btn" data-email="' + escapeHtml(u.email) + '">Enviar reset de contraseña</a>' +
 				'<a href="javascript:;" class="dropdown-item resend-invite-btn" data-email="' + escapeHtml(u.email) + '">Reenviar invitación</a>' +
@@ -76,7 +113,11 @@
 			supabase.from("user_roles").select("user_id, role"),
 		]).then(function (results) {
 			var usersRes = results[0], accountsRes = results[1], assignmentsRes = results[2], rolesRes = results[3];
-			users = (usersRes.data && usersRes.data.users) || [];
+			if (usersRes.error) throw new Error(usersRes.error.context && usersRes.error.context.status === 401 ? 'Tu sesión venció. Inicia sesión nuevamente.' : 'No se pudieron cargar los miembros. Vuelve a cargar la lista.');
+            for (var res of [accountsRes, assignmentsRes, rolesRes]) if (res.error) throw new Error(res.error.message);
+            accessData = usersRes.data || {};
+            users = accessData.users || [];
+            $('#membersLoadError').remove();
 			assignments = assignmentsRes.data || [];
 			roles = rolesRes.data || [];
 			var seen = {};
@@ -89,7 +130,11 @@
 			});
 			renderStats();
 			renderMembers();
-		});
+        }).catch(function(err) {
+            $('#membersTableBody').empty();
+            $('#membersLoadError').remove();
+            $('<div>', { id: 'membersLoadError', class: 'alert alert-danger', text: err.message }).append($('<button>', { type:'button', class:'btn btn-light btn-sm ms-2', text:'Volver a cargar' }).on('click', loadData)).insertBefore('#membersTableBody');
+        });
 	}
 
 	function invokeAdmin(body) {

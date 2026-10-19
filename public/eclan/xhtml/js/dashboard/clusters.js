@@ -3,6 +3,7 @@
 
 	if (typeof AuditClient === "undefined" || typeof ClusterLib === "undefined") return;
 	var supabase = AuditClient.supabase;
+    var canEdit = false;
 	var SUPABASE_URL = "https://szdivobcbdkiszgrizic.supabase.co";
 	var SUPABASE_ANON_KEY = "sb_publishable_ldumgPigulWT8adpCHpa_Q_dLVy4EC-";
 	var clientId = new URLSearchParams(window.location.search).get("client_id");
@@ -57,10 +58,10 @@
 
 	function renderCatalog(progressBySection) {
 		$("#clusterCatalog").html(ClusterLib.CLUSTER_CATALOG.map(function (def) {
-			var locked = !!runThisMonth(def.key);
+			var locked = canEdit && !!runThisMonth(def.key);
 			var isRunning = runningKey === def.key;
 			var total = def.navLabels.length;
-			var btnLabel = isRunning ? "Generando…" : locked ? "Próximo mes" : "Correr cluster";
+			var btnLabel = isRunning ? "Generando…" : locked ? "Próximo mes" : canEdit ? "Correr cluster" : "Generar vista previa";
 			var btnIcon = isRunning ? "fa-spinner fa-spin" : locked ? "fa-lock" : "fa-magic";
 			var progressHtml = "";
 			if (isRunning) {
@@ -110,7 +111,7 @@
 				'<div class="min-w-0"><div class="fw-medium text-ov">' + escapeHtml(r.title) + '</div><div class="fs-12 text-muted">' + fmtDate(r.created_at) + (r.model ? " · " + r.model : "") + "</div></div>" +
 				'<div class="shrink-0">' +
 				'<a href="javascript:;" class="btn btn-light btn-sm sharp me-1 view-run-btn" data-id="' + r.id + '"><i class="fa fa-eye"></i></a>' +
-				'<a href="javascript:;" class="btn btn-light btn-sm sharp delete-run-btn" data-id="' + r.id + '"><i class="fa fa-trash text-danger"></i></a>' +
+				(canEdit ? '<a href="javascript:;" class="btn btn-light btn-sm sharp delete-run-btn" data-id="' + r.id + '"><i class="fa fa-trash text-danger"></i></a>' : '') +
 				"</div></div>"
 			);
 		}).join(""));
@@ -161,7 +162,7 @@
 		bootstrap.Modal.getOrCreateInstance(document.getElementById("deleteRunModal")).show();
 	});
 	$("#confirmDeleteRunBtn").on("click", function () {
-		if (!deleteTargetId) return;
+		if (!canEdit || !deleteTargetId) return;
 		supabase.from("cluster_runs").delete().eq("id", deleteTargetId).then(function () {
 			bootstrap.Modal.getOrCreateInstance(document.getElementById("deleteRunModal")).hide();
 			deleteTargetId = null;
@@ -187,7 +188,7 @@
 					Authorization: "Bearer " + (accessToken || SUPABASE_ANON_KEY),
 					apikey: SUPABASE_ANON_KEY,
 				},
-				body: JSON.stringify({ clientId: clientId, clusterKey: clusterKey }),
+				body: JSON.stringify({ clientId: clientId, clusterKey: clusterKey, preview: !canEdit }),
 			});
 		}).then(function (res) {
 			if (!res.ok) {
@@ -236,7 +237,8 @@
 				var html = ClusterLib.buildFormulaHtml(parsed.hero, parsed.sections.slice(0, total), def.navLabels);
 				var title = def.title + " — " + ($("#clientTitle").data("name") || "Cliente");
 
-				return supabase.auth.getUser().then(function (userRes) {
+				if (!canEdit) { openViewer(html, title); return; }
+                return supabase.auth.getUser().then(function (userRes) {
 					var userId = userRes.data && userRes.data.user && userRes.data.user.id;
 					return supabase.from("cluster_runs").insert({
 						user_id: userId, client_id: clientId, cluster_key: clusterKey,
@@ -262,7 +264,8 @@
 	if (!clientId) {
 		showOnly($clientNotFound);
 	} else {
-		AuditClient.getSession().then(function (session) {
+		Promise.all([AuditClient.getSession(), AuditClient.getCurrentIdentity()]).then(function (results) {
+            var session = results[0]; canEdit = !!results[1] && results[1].role === "admin";
 			if (!session) { showOnly($authRequired); window.location.replace("page-login.html"); return; }
 			showOnly($loading);
 			supabase.from("audit_clients").select("id, name, description").eq("id", clientId).maybeSingle()

@@ -3,6 +3,7 @@
 
 	if (typeof AuditClient === "undefined") return;
 	var supabase = AuditClient.supabase;
+    var canEdit = false;
 	var SUPABASE_URL = "https://szdivobcbdkiszgrizic.supabase.co";
 	var SUPABASE_ANON_KEY = "sb_publishable_ldumgPigulWT8adpCHpa_Q_dLVy4EC-";
 	var clientId = new URLSearchParams(window.location.search).get("client_id");
@@ -49,6 +50,7 @@
 	$("#addEmailBtn").on("click", addEmail);
 	$("#emailInput").on("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addEmail(); } });
 	function addEmail() {
+        if (!canEdit) return;
 		var email = $("#emailInput").val().trim();
 		if (!email) return;
 		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Correo inválido"); return; }
@@ -85,7 +87,7 @@
 				"<div>" +
 				(r.sent_at ? '<span class="badge bg-success-light text-success me-2">Enviado</span>' : "") +
 				'<a href="javascript:;" class="btn btn-light btn-sm sharp me-1 view-report-btn" data-id="' + r.id + '"><i class="fa fa-eye"></i></a>' +
-				'<a href="javascript:;" class="btn btn-light btn-sm sharp delete-report-btn" data-id="' + r.id + '"><i class="fa fa-trash text-danger"></i></a>' +
+				(canEdit ? '<a href="javascript:;" class="btn btn-light btn-sm sharp delete-report-btn" data-id="' + r.id + '"><i class="fa fa-trash text-danger"></i></a>' : '') +
 				"</div></div>"
 			);
 		}).join(""));
@@ -131,7 +133,7 @@
 		bootstrap.Modal.getOrCreateInstance(document.getElementById("deleteRunModal")).show();
 	});
 	$("#confirmDeleteRunBtn").on("click", function () {
-		if (!deleteTargetId) return;
+		if (!canEdit || !deleteTargetId) return;
 		supabase.from("weekly_reports").delete().eq("id", deleteTargetId).then(function () {
 			bootstrap.Modal.getOrCreateInstance(document.getElementById("deleteRunModal")).hide();
 			deleteTargetId = null;
@@ -140,6 +142,7 @@
 	});
 
 	function generate(send) {
+        if (send && !canEdit) return;
 		if (send && recipients.length === 0) { alert("Agrega destinatarios antes de enviar."); return; }
 		var $btn = send ? $("#sendBtn") : $("#previewBtn");
 		var originalHtml = $btn.html();
@@ -175,9 +178,12 @@
 	if (!clientId) {
 		showOnly($clientNotFound);
 	} else {
-		AuditClient.getSession().then(function (session) {
+		Promise.all([AuditClient.getSession(), AuditClient.getCurrentIdentity()]).then(function (results) {
+            var session = results[0]; canEdit = !!results[1] && results[1].role === "admin";
 			if (!session) { showOnly($authRequired); window.location.replace("page-login.html"); return; }
 			showOnly($loading);
+            $('#sendBtn').toggleClass('d-none', !canEdit);
+            $('#emailInput').closest('.card').toggleClass('d-none', !canEdit);
 			supabase.from("audit_clients").select("id, name, report_recipients").eq("id", clientId).maybeSingle()
 				.then(function (res) {
 					if (res.error) { showOnly($migrationPending); return; }

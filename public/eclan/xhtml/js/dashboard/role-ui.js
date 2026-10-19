@@ -39,7 +39,9 @@
 			$profileMenu.prepend($identity);
 		}
 
-		var requiredRole = document.body.getAttribute("data-page-access");
+		var intelligencePages = ['brief.html', 'clusters.html', 'reporte-semanal.html', 'preguntar-ia.html', 'seleccionar-cliente.html'];
+        if (intelligencePages.includes(location.pathname.split('/').pop())) document.body.removeAttribute('data-page-access');
+        var requiredRole = document.body.getAttribute("data-page-access");
 		if (requiredRole && identity.role !== requiredRole) {
 			window.location.replace("index.html");
 			return;
