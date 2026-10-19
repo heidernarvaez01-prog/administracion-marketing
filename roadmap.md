@@ -13,5 +13,5 @@
 - [x] Verificar respuestas de IA basadas en datos reales y aislamiento de acceso.
 
 # Recuperación de sesión
-- [ ] Recuperar consultas de métricas rechazadas con 401 mediante una renovación compartida y un único reintento.
-- [ ] Verificar recuperación, límite de reintentos y Dashboard de Ginecea con sesión real, manteniendo el rechazo sin sesión.
+- [x] Recuperar consultas de métricas rechazadas con 401 mediante una renovación compartida y un único reintento.
+- [x] Verificar seis pruebas de recuperación y límites; Dashboard de Ginecea con sesión real y rechazo anónimo 401. Recuperación en navegador comprobada con 401 y renovación simulados; la renovación real no fue verificable con la sesión de prueba.
